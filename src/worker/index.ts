@@ -239,7 +239,7 @@ app.post("/api/auth/logout", async (c) => {
 
 app.get("/api/auth/me", async (c) => {
   const m = await currentUser(c);
-  if (!m) return err(c, 401, "not logged in");
+  if (!m) return c.json({ member: null });
   const { password_hash, salt, ...safe } = m;
   return c.json({ member: safe });
 });

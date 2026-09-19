@@ -57,8 +57,8 @@ function Layout({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="hdr-actions">
-            <button className="lang-toggle" onClick={toggleTheme} aria-pressed={theme === "dark"} aria-label="toggle dark mode">{theme === "light" ? t.theme_dark : t.theme_light}</button>
-            <button className="lang-toggle" onClick={toggle} aria-pressed={lang === "en"} aria-label="switch language">{t.language}</button>
+            <button className="lang-toggle" onClick={toggleTheme} aria-pressed={theme === "dark"}>{theme === "light" ? t.theme_dark : t.theme_light}</button>
+            <button className="lang-toggle" onClick={toggle} aria-pressed={lang === "en"}>{t.language}</button>
             {me ? (
               <>
                 {me.role === "admin" && <Link className="btn small" to="/admin">{t.admin}</Link>}
