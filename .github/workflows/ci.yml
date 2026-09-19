@@ -45,6 +45,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
       - run: npm ci
       - name: Reset local D1 and apply seed
         run: |
