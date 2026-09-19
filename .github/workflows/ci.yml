@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  smoke:
+    name: API smoke test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Reset local D1 and apply seed
+        run: |
+          npx wrangler d1 execute starisle --local --file=src/db/schema.sql
+          npx wrangler d1 execute starisle --local --file=src/db/seed.sql
+      - name: Start worker and smoke test endpoints
+        run: |
+          npx wrangler dev --port 8787 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8787/api/stats && break || sleep 2
+          done
+          curl -sf http://localhost:8787/ | grep -q "星屿"
+          curl -sf http://localhost:8787/api/projects | grep -q "projects"
+          curl -sf http://localhost:8787/api/courses | grep -q "courses"
+          curl -sf http://localhost:8787/api/members | grep -q "members"
+          curl -sf http://localhost:8787/api/mentors | grep -q "mentors"
+          curl -sf http://localhost:8787/api/columns | grep -q "columns"
+          TOKEN=$(curl -sf -X POST http://localhost:8787/api/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-smoke-test","password":"ci-password-123","display_name":"CI","email":"ci@example.com","statement":"automated smoke test application","consent_privacy":true,"consent_public":true}' | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])")
+          curl -sf -X POST http://localhost:8787/api/auth/application/status \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-smoke-test","password":"ci-password-123"}' | grep -q pending
+          echo "smoke test passed, receipt: $TOKEN"
