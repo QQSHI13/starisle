@@ -267,3 +267,24 @@ footer.site .legal { margin-top: 52px; padding-top: 20px; border-top: 1px solid 
 
 /* ---------- partner logos ---------- */
 .partner-logo { height: 44px; max-width: 100%; object-fit: contain; margin-bottom: 6px; }
+
+.switch {
+  display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px;
+  padding: 3px; gap: 2px; margin-bottom: 30px; background: var(--card);
+}
+.switch a {
+  padding: 7px 20px; border-radius: 999px; font-size: 14px; color: var(--ink-2);
+  font-weight: 500; white-space: nowrap;
+}
+.switch a:hover { color: var(--ink); }
+.switch a.active { background: var(--ink); color: var(--paper); }
+
+.card-poster {
+  width: calc(100% + 52px); margin: -26px -26px 8px;
+  aspect-ratio: 16/9; object-fit: cover; display: block;
+  border-radius: 6px 6px 0 0; border-bottom: 1px solid var(--line);
+}
+.detail-poster {
+  max-width: 460px; width: 100%; border: 1px solid var(--line-strong);
+  border-radius: 6px; margin-top: 24px; display: block;
+}

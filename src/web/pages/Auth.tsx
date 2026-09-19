@@ -4,6 +4,16 @@ import { useLang } from "../i18n";
 import { api } from "../api";
 import { useMe } from "../App";
 
+function AuthSwitch({ active }: { active: "login" | "apply" }) {
+  const { t } = useLang();
+  return (
+    <div className="switch" role="tablist">
+      <Link to="/login" role="tab" aria-selected={active === "login"} className={active === "login" ? "active" : ""}>{t.login_title}</Link>
+      <Link to="/apply" role="tab" aria-selected={active === "apply"} className={active === "apply" ? "active" : ""}>{t.apply_title}</Link>
+    </div>
+  );
+}
+
 function Field({ label, hint, ...props }: any) {
   return (
     <label className="field">
@@ -31,6 +41,7 @@ export function Apply() {
   };
   return (
     <div className="form-page">
+      <AuthSwitch active="apply" />
       <h1>{t.apply_title}</h1>
       <p className="sub">{t.apply_sub}</p>
       {token ? (
@@ -104,6 +115,7 @@ export function Login() {
   };
   return (
     <div className="form-page">
+      <AuthSwitch active="login" />
       <h1>{t.login_title}</h1>
       <p className="sub">{t.login_sub}</p>
       <form onSubmit={submit}>

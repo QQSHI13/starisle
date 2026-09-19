@@ -19,7 +19,6 @@ export function Projects() {
   }, [q, domain]);
   const { data, error } = useFetch<{ projects: any[] }>(query, [query]);
   const { data: domData } = useFetch<{ domains: any[] }>("/domains");
-  const { data: showcase } = useFetch<{ posters: any[] }>("/showcase");
 
   return (
     <>
@@ -43,22 +42,7 @@ export function Projects() {
           {(data?.projects ?? []).map((p) => <ProjectCard key={p.slug} p={p} />)}
         </div>
         {data && data.projects.length === 0 && <div className="empty"><b>∅</b>{t.no_items}</div>}
-        {showcase && showcase.posters.length > 0 && (
-          <>
-            <h3 style={{ margin: "56px 0 20px" }}>2026 {lang === "zh" ? "届结业项目展板" : "Graduation Showcase"}</h3>
-            <div className="showcase">
-              {showcase.posters.map((p) => (
-                <figure key={p.slug}>
-                  <a href={p.poster_url} target="_blank" rel="noreferrer">
-                    <img src={p.poster_url} alt={p.name} loading="lazy" />
-                  </a>
-                  <figcaption>{p.name}</figcaption>
-                </figure>
-              ))}
-            </div>
-          </>
-        )}
-      </div></section>
+              </div></section>
     </>
   );
 }
@@ -77,6 +61,7 @@ export function ProjectDetail() {
         <p className="kicker">{p.domain_name ?? t.nav_projects}</p>
         <h1>{p.name}</h1>
         {p.tagline && <p className="sub">{p.tagline}</p>}
+        {p.poster_url && <img className="detail-poster" src={p.poster_url} alt={`${p.name} 展板`} />}
       </div></div>
       <section className="block"><div className="wrap">
         {data.stack.length > 0 && (

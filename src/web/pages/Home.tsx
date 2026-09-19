@@ -13,6 +13,7 @@ export function ProjectCard({ p }: { p: Project }) {
   const { t, lang } = useLang();
   return (
     <Link className="card" to={`/projects/${p.slug}`}>
+      {(p as any).poster_url && <img className="card-poster" src={(p as any).poster_url} alt="" loading="lazy" />}
       <h3>{p.name}</h3>
       {p.tagline && <p className="tagline">{p.tagline}</p>}
       <div className="meta">
