@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useLang } from "../i18n";
 import { useFetch, timeAgo } from "../hooks";
+import { I } from "../icons";
 
 type Project = {
   slug: string; name: string; tagline: string; domain_name: string | null;
@@ -17,8 +18,8 @@ export function ProjectCard({ p }: { p: Project }) {
       <div className="meta">
         {p.domain_name && <span className="pill">{p.domain_name}</span>}
         <span>{p.owner_display}</span>
-        <span>{p.member_count} {t.members_n}</span>
-        <span>{timeAgo(p.updated_at, lang)}</span>
+        <span><I name="users" size={12} /> {p.member_count} {t.members_n}</span>
+        <span><I name="clock" size={12} /> {timeAgo(p.updated_at, lang)}</span>
         {p.gaps?.map((g) => <span key={g} className="pill gap">{t.open_role} · {g}</span>)}
       </div>
     </Link>

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { D1Database } from "@cloudflare/workers-types";
 
-type Bindings = { DB: D1Database };
+type Bindings = { DB: D1Database; ASSETS: Fetcher };
 type Member = {
   id: number; username: string; display_name: string; email: string | null;
   bio: string | null; repo_url: string | null; avatar: string | null;
@@ -103,7 +103,18 @@ app.get("/api/projects/:slug", async (c) => {
      JOIN members m ON m.id = pm.member_id WHERE pm.project_id = ?`).bind(p.id).all();
   const gaps = await c.env.DB.prepare(
     `SELECT label FROM project_gaps WHERE project_id = ?`).bind(p.id).all();
-  return c.json({ project: p, members: members.results, gaps: gaps.results.map((g: any) => g.label) });
+  const stacks = await c.env.DB.prepare(
+    `SELECT tag FROM project_stacks WHERE project_id = ? ORDER BY id`).bind(p.id).all();
+  const milestones = await c.env.DB.prepare(
+    `SELECT text, done FROM project_milestones WHERE project_id = ? ORDER BY sort, id`).bind(p.id).all();
+  const repo_stats = await repoStatsFor(c, p);
+  return c.json({
+    project: p, members: members.results,
+    gaps: gaps.results.map((g: any) => g.label),
+    stack: stacks.results.map((s: any) => s.tag),
+    milestones: milestones.results,
+    repo_stats,
+  });
 });
 
 app.get("/api/courses", async (c) =>
@@ -336,6 +347,52 @@ app.get("/api/showcase", async (c) => {
   return c.json({ posters: results });
 });
 
+// ---------- repository stats (server-side, cached 6h in D1) ----------
+async function fetchRepoStats(repoUrl: string): Promise<Record<string, unknown> | null> {
+  try {
+    const u = new URL(repoUrl);
+    let api: string | null = null;
+    const gh = u.hostname === "github.com" && u.pathname.match(/^\/([^/]+)\/([^/]+)/);
+    const gt = u.hostname === "gitee.com" && u.pathname.match(/^\/([^/]+)\/([^/]+)/);
+    if (gh) api = `https://api.github.com/repos/${gh[1]}/${gh[2]}`;
+    else if (gt) api = `https://gitee.com/api/v5/repos/${gt[1]}/${gt[2]}`;
+    if (!api) return null;
+    const r = await fetch(api, {
+      headers: { "User-Agent": "starisle-demo", Accept: "application/vnd.github+json" },
+    });
+    if (!r.ok) return { error: `upstream ${r.status}` };
+    const d: any = await r.json();
+    return {
+      host: gh ? "github" : "gitee",
+      stars: d.stargazers_count ?? d.stargazers ?? 0,
+      forks: d.forks_count ?? d.forks ?? 0,
+      open_issues: d.open_issues_count ?? 0,
+      language: d.language ?? null,
+      last_push: d.pushed_at ?? d.pushed_at ?? null,
+      license: d.license?.spdx_id ?? d.license?.name ?? null,
+      description: d.description ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function repoStatsFor(c: { env: Bindings }, project: any) {
+  if (!project.repo_url) return null;
+  const cached = await c.env.DB.prepare(
+    `SELECT data, fetched_at FROM repo_cache WHERE project_id = ?`).bind(project.id).first<any>();
+  if (cached && cached.fetched_at > new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 19).replace("T", " "))
+    return JSON.parse(cached.data);
+  const stats = await fetchRepoStats(project.repo_url);
+  if (stats && !stats.error) {
+    await c.env.DB.prepare(
+      `INSERT INTO repo_cache (project_id, data, fetched_at) VALUES (?,?, datetime('now'))
+       ON CONFLICT (project_id) DO UPDATE SET data = excluded.data, fetched_at = datetime('now')`)
+      .bind(project.id, JSON.stringify(stats)).run();
+  }
+  return stats ?? (cached ? JSON.parse(cached.data) : null);
+}
+
 const slugify = (name: string) =>
   (name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, "-").replace(/^-+|-+$/g, "") || "project") + "-" + Math.random().toString(36).slice(2, 8);
 
@@ -501,3 +558,15 @@ app.post("/api/admin/enrollments/:id", async (c) => {
 });
 
 export default app;
+
+// SPA fallback: non-API GET requests receive the app shell.
+// (Asset requests for real files are served by the assets runtime before this runs.)
+app.get("*", async (c) => {
+  const url = new URL(c.req.url);
+  if (url.pathname.startsWith("/api/")) return c.notFound();
+  const index = await c.env.ASSETS.fetch(new URL("/index.html", c.req.url));
+  return new Response(index.body, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" },
+  });
+});

@@ -68,6 +68,13 @@ for (const d of details) {
     const mid = `(SELECT id FROM members WHERE username=${esc(m.username)})`;
     L.push(`INSERT OR IGNORE INTO project_members (project_id,member_id,role) VALUES ((SELECT id FROM projects WHERE slug=${esc(p.slug)}),${mid},${esc(m.role ?? "member")});`);
   }
+  for (const t of p.stack ?? [])
+    L.push(`INSERT OR IGNORE INTO project_stacks (project_id,tag) SELECT (SELECT id FROM projects WHERE slug=${esc(p.slug)}),${esc(t)} WHERE NOT EXISTS (SELECT 1 FROM project_stacks WHERE project_id=(SELECT id FROM projects WHERE slug=${esc(p.slug)}) AND tag=${esc(t)});`);
+  const ms = Array.isArray(p.milestones) ? p.milestones : [];
+  ms.forEach((m, i) => {
+    const text = typeof m === "string" ? m : (m.text ?? m.title ?? "");
+    if (text) L.push(`INSERT OR IGNORE INTO project_milestones (project_id,text,done,sort) SELECT (SELECT id FROM projects WHERE slug=${esc(p.slug)}),${esc(text)},${m.done ? 1 : 0},${i} WHERE NOT EXISTS (SELECT 1 FROM project_milestones WHERE project_id=(SELECT id FROM projects WHERE slug=${esc(p.slug)}) AND text=${esc(text)});`);
+  });
   for (const g of d.gaps ?? [])
     L.push(`INSERT INTO project_gaps (project_id,label) SELECT (SELECT id FROM projects WHERE slug=${esc(p.slug)}),${esc(g.label ?? g)} WHERE NOT EXISTS (SELECT 1 FROM project_gaps WHERE project_id=(SELECT id FROM projects WHERE slug=${esc(p.slug)}) AND label=${esc(g.label ?? g)});`);
 }

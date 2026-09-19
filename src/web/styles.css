@@ -208,3 +208,19 @@ footer.site .legal { margin-top: 52px; padding-top: 20px; border-top: 1px solid 
   footer.site .cols { grid-template-columns: 1fr; }
   .toolbar input[type="text"] { width: 100%; }
 }
+
+/* ---------- polish: avatars & icons ---------- */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; color: #f7f2e9; font-weight: 600;
+  font-family: var(--sans); flex: none; line-height: 1; user-select: none;
+}
+.icon { vertical-align: -2px; flex: none; }
+.kv dt { display: flex; align-items: center; gap: 7px; }
+.card .meta .icon { color: var(--gold); }
+.mstone { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.mstone:last-child { border-bottom: 0; }
+.mstone .mtext { flex: 1; }
+.mstone.done .mtext { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+.mstone .icon { color: var(--gold); }
+.member-row .avatar { align-self: center; }

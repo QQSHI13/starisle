@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
+import { Avatar } from "../Avatar";
 
 export function Students() {
   const { t } = useLang();
@@ -15,6 +16,7 @@ export function Students() {
       <section className="block"><div className="wrap">
         {(data?.members ?? []).map((m) => (
           <div className="member-row" key={m.username}>
+            <Avatar name={m.display_name || m.username} />
             <span className="dname">{m.display_name}</span>
             <span className="uname">@{m.username}</span>
             <span className="bio">{m.bio ?? t.no_bio}</span>
@@ -37,7 +39,9 @@ export function Profile() {
     <>
       <div className="page-head"><div className="wrap">
         <p className="kicker">@{m.username}</p>
-        <h1>{m.display_name}</h1>
+        <h1 style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Avatar name={m.display_name || m.username} size={52} /> {m.display_name}
+        </h1>
         {m.bio && <p className="sub">{m.bio}</p>}
         {m.repo_url && <p className="sub"><a href={m.repo_url} target="_blank" rel="noreferrer">{m.repo_url}</a></p>}
       </div></div>

@@ -4,6 +4,7 @@ import { useLang } from "../i18n";
 import { api } from "../api";
 import { useMe } from "../App";
 import { useFetch } from "../hooks";
+import { Avatar } from "../Avatar";
 
 export default function Me() {
   const { t } = useLang();
@@ -21,7 +22,7 @@ export default function Me() {
   return (
     <div className="wrap" style={{ padding: "64px 24px" }}>
       <div className="page-head" style={{ padding: "0 0 28px" }}>
-        <h1 style={{ margin: 0 }}>{me.display_name}</h1>
+        <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 14 }}><Avatar name={me.display_name} size={52} /> {me.display_name}</h1>
         <p className="sub">@{me.username}{me.role === "admin" ? " · admin" : ""}</p>
       </div>
 

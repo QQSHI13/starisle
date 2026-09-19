@@ -3,6 +3,7 @@ import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
 import { api } from "../api";
 import { useMe } from "../App";
+import { Avatar } from "../Avatar";
 
 export default function Mentors() {
   const { t } = useLang();
@@ -50,7 +51,7 @@ export default function Mentors() {
         <div className="grid">
           {mentors.map((m) => (
             <div className="card" key={m.id}>
-              <h3>{m.name}</h3>
+              <h3 style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={m.name} /> {m.name}</h3>
               <span className="pill">{m.title}</span>
               <p className="tagline">{m.bio}</p>
               {me && (
