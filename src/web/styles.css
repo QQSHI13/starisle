@@ -125,7 +125,7 @@ section.block { padding: 72px 0; border-bottom: 1px solid var(--line); }
 .block-head .more { font-size: 13.5px; color: var(--ink-3); white-space: nowrap; }
 .sec-num { color: var(--gold); font-family: var(--serif); font-size: 14px; margin-right: 14px; font-weight: 600; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 20px; align-items: start; }
 .card {
   border: 1px solid var(--line); border-radius: 6px; padding: 26px;
   background: var(--card); display: flex; flex-direction: column; gap: 12px;
