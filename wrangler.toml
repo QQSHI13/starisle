@@ -8,4 +8,4 @@ directory = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "starisle"
-database_id = "local-starisle"
+database_id = "3bcd4a66-995d-4a64-9c57-e5a3c6d8fca4"
