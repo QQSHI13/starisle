@@ -1,0 +1,172 @@
+CREATE TABLE IF NOT EXISTS members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  email TEXT,
+  bio TEXT,
+  repo_url TEXT,
+  avatar TEXT,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'member',
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  repo_url TEXT,
+  statement TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS recovery_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  code_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS domains (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  tagline TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  repo_url TEXT,
+  demo_url TEXT,
+  poster_url TEXT,
+  domain_id TEXT REFERENCES domains(id),
+  status TEXT NOT NULL DEFAULT 'pending',
+  owner_id INTEGER NOT NULL REFERENCES members(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS project_members (
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  role TEXT NOT NULL DEFAULT 'member',
+  PRIMARY KEY (project_id, member_id)
+);
+
+CREATE TABLE IF NOT EXISTS project_gaps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  label TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS courses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  track TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  instructors TEXT NOT NULL DEFAULT '',
+  total_hours INTEGER,
+  featured INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'published',
+  lesson_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS enrollments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  course_id INTEGER NOT NULL REFERENCES courses(id),
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (member_id, course_id)
+);
+
+CREATE TABLE IF NOT EXISTS columns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  column_label TEXT NOT NULL,
+  title TEXT NOT NULL,
+  subtitle TEXT NOT NULL DEFAULT '',
+  author TEXT NOT NULL DEFAULT '',
+  author_title TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL,
+  published_at TEXT NOT NULL DEFAULT (date('now'))
+);
+
+CREATE TABLE IF NOT EXISTS mentors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  bio TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS mentor_courses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mentor_id INTEGER NOT NULL REFERENCES mentors(id) ON DELETE CASCADE,
+  course_title TEXT NOT NULL,
+  hours INTEGER,
+  level TEXT
+);
+
+CREATE TABLE IF NOT EXISTS mentor_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  mentor_id INTEGER NOT NULL REFERENCES mentors(id),
+  interest TEXT NOT NULL,
+  background TEXT NOT NULL DEFAULT '',
+  questions TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS activities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  starts_at TEXT,
+  location TEXT
+);
+
+CREATE TABLE IF NOT EXISTS resources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'coming_soon'
+);
+
+CREATE TABLE IF NOT EXISTS partners (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  website TEXT,
+  monogram TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  text TEXT NOT NULL,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
