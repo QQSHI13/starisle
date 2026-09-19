@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Link, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { useLang } from "./i18n";
 import { api } from "./api";
+import { Avatar } from "./Avatar";
 import Home from "./pages/Home";
 import { Projects, ProjectDetail } from "./pages/Projects";
 import { Courses, CourseDetail } from "./pages/Courses";
@@ -32,6 +33,45 @@ const Star = () => (
   </svg>
 );
 
+function UserMenu() {
+  const { t } = useLang();
+  const { me, logout } = useMe();
+  const nav = useNavigate();
+  const [items, setItems] = useState<any[]>([]);
+  const refresh = () =>
+    api("/notifications").then((d) => setItems(d.notifications)).catch(() => {});
+  useEffect(() => { refresh(); }, []);
+  const unread = items.filter((n) => !n.read).length;
+  const markAll = async () => { await api("/notifications/read", { method: "POST" }); refresh(); };
+  return (
+    <div className="umenu">
+      <button className="umenu-btn" aria-label={t.me} onClick={() => nav("/me")}>
+        <Avatar name={me!.display_name} src={(me as any).avatar} size={30} />
+        {unread > 0 && <span className="umenu-dot" aria-label={`${unread}`} />}
+      </button>
+      <div className="umenu-panel" role="menu">
+        <div className="umenu-head">
+          <span>{t.notifications}{unread > 0 ? ` · ${unread}` : ""}</span>
+          {unread > 0 && <button className="umenu-link" onClick={markAll}>{lang_allread(t)}</button>}
+        </div>
+        {items.length === 0 && <div className="umenu-empty">—</div>}
+        {items.slice(0, 5).map((n) => (
+          <Link key={n.id} to="/me" className={`umenu-item${n.read ? " read" : ""}`}>
+            {n.text}
+          </Link>
+        ))}
+        <div className="umenu-foot">
+          <Link to="/me" className="umenu-link">{t.me} →</Link>
+          {me!.role === "admin" && <Link to="/admin" className="umenu-link">{t.admin}</Link>}
+          <button className="umenu-link" onClick={() => { logout(); nav("/"); }}>{t.logout}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const lang_allread = (t: any) => (t.language === "中文" ? "全部已读" : "Mark all read");
+
 function Layout({ children }: { children: ReactNode }) {
   const { t, toggle, toggleTheme, theme, lang } = useLang();
   const { me, logout } = useMe();
@@ -60,11 +100,7 @@ function Layout({ children }: { children: ReactNode }) {
             <button className="lang-toggle" onClick={toggleTheme} aria-pressed={theme === "dark"}>{theme === "light" ? t.theme_dark : t.theme_light}</button>
             <button className="lang-toggle" onClick={toggle} aria-pressed={lang === "en"}>{t.language}</button>
             {me ? (
-              <>
-                {me.role === "admin" && <Link className="btn small" to="/admin">{t.admin}</Link>}
-                <Link className="btn small" to="/me">{t.me}</Link>
-                <button className="btn small" onClick={() => { logout(); nav("/"); }}>{t.logout}</button>
-              </>
+              <UserMenu />
             ) : (
               <>
                 <Link className="btn small" to="/login">{t.login}</Link>

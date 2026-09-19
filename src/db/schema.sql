@@ -160,6 +160,7 @@ CREATE TABLE IF NOT EXISTS partners (
   name TEXT NOT NULL,
   category TEXT NOT NULL,
   website TEXT,
+  logo_url TEXT,
   monogram TEXT NOT NULL DEFAULT ''
 );
 

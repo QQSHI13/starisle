@@ -1,6 +1,6 @@
 // Pulls the real public data from the live starisle site and generates src/db/seed-data.sql.
 // Password hashes are left as a placeholder (see scripts/hash-passwords.mjs).
-import { writeFileSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 
 const BASE = "https://forum.aiyf.org.cn/api";
 const OUT = new URL("../src/db/seed-data.sql", import.meta.url).pathname;
@@ -10,6 +10,19 @@ async function get(path) {
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json();
 }
+
+mkdirSync(new URL("../public/avatars", import.meta.url).pathname, { recursive: true });
+mkdirSync(new URL("../public/posters", import.meta.url).pathname, { recursive: true });
+
+const dataUri = (v, dir, name) => {
+  if (typeof v !== "string" || !v.startsWith("data:image")) return null;
+  const m = v.match(/^data:image\/(\w+);base64,(.+)$/s);
+  if (!m) return null;
+  const ext = m[1] === "jpeg" ? "jpg" : m[1];
+  const safe = String(name).replace(/[^a-zA-Z0-9_-]/g, "_");
+  writeFileSync(new URL(`../public/${dir}/${safe}.${ext}`, import.meta.url).pathname, Buffer.from(m[2], "base64"));
+  return `/${dir}/${safe}.${ext}`;
+};
 
 const esc = (v) => {
   if (v === null || v === undefined) return "NULL";
@@ -43,10 +56,12 @@ for (const d of domains)
   L.push(`INSERT OR IGNORE INTO domains (id,name,color) VALUES (${esc(d.id)},${esc(d.name)},${esc(d.color)});`);
 
 // members: everyone gets the dev password placeholder, hashed in a later step
-for (const m of members)
+for (const m of members) {
+  const avatar = dataUri(m.avatar, "avatars", m.id);
   L.push(
-    `INSERT OR IGNORE INTO members (id,username,display_name,bio,repo_url,password_hash,salt,created_at) VALUES (${m.id},${esc(m.username)},${esc(m.display_name)},${esc(m.bio)},${esc(m.repo_url)},'__HASH__','__SALT__',${esc(m.created_at)});`
+    `INSERT INTO members (id,username,display_name,bio,repo_url,avatar,password_hash,salt,created_at) VALUES (${m.id},${esc(m.username)},${esc(m.display_name)},${esc(m.bio)},${esc(m.repo_url)},${esc(avatar)},'__HASH__','__SALT__',${esc(m.created_at)}) ON CONFLICT(id) DO UPDATE SET avatar=excluded.avatar, bio=excluded.bio, repo_url=excluded.repo_url;`
   );
+}
 
 // demo/admin accounts (documented credentials, dev only)
 L.push(
@@ -64,6 +79,9 @@ for (const d of details) {
   L.push(
     `INSERT OR IGNORE INTO projects (slug,name,tagline,body,repo_url,demo_url,domain_id,status,owner_id,created_at,updated_at) VALUES (${esc(p.slug)},${esc(p.name)},${esc(p.tagline ?? "")},${esc(p.body || p.description || "")},${esc(p.repo_url)},${esc(p.demo_url)},${esc(p.domain_id)},'approved',${ownerRef(p.owner?.username ?? "")},${esc(p.created_at)},${esc(p.updated_at ?? p.created_at)});`
   );
+  const posterPath = dataUri(p.poster, "posters", p.slug);
+  if (posterPath)
+    L.push(`UPDATE projects SET poster_url = ${esc(posterPath)} WHERE slug = ${esc(p.slug)};`);
   for (const m of d.members ?? []) {
     const mid = `(SELECT id FROM members WHERE username=${esc(m.username)})`;
     L.push(`INSERT OR IGNORE INTO project_members (project_id,member_id,role) VALUES ((SELECT id FROM projects WHERE slug=${esc(p.slug)}),${mid},${esc(m.role ?? "member")});`);
@@ -95,8 +113,10 @@ for (const m of mentors) {
     L.push(`INSERT INTO mentor_courses (mentor_id,course_title,hours,level) SELECT ${m.id},${esc(mc.title)},${esc(mc.total_hours ?? mc.hours)},${esc(mc.level)} WHERE NOT EXISTS (SELECT 1 FROM mentor_courses WHERE mentor_id=${m.id} AND course_title=${esc(mc.title)});`);
 }
 
-for (const p of partners)
-  L.push(`INSERT OR IGNORE INTO partners (id,slug,name,category,website,monogram) VALUES (${p.id},${esc(p.slug)},${esc(p.name)},${esc(p.category)},${esc(p.website)},${esc(p.monogram ?? "")});`);
+for (const p of partners) {
+  const logo = p.logo_path ? "https://forum.aiyf.org.cn" + p.logo_path.split(" ").map(encodeURIComponent).join(" ") : null;
+  L.push(`INSERT INTO partners (id,slug,name,category,website,logo_url,monogram) VALUES (${p.id},${esc(p.slug)},${esc(p.name)},${esc(p.category)},${esc(p.website)},${esc(logo)},${esc(p.monogram ?? "")}) ON CONFLICT(id) DO UPDATE SET logo_url=excluded.logo_url, website=excluded.website;`);
+}
 
 writeFileSync(OUT, L.join("\n") + "\n");
 console.log(`seed-data.sql written: ${L.length} statements`);

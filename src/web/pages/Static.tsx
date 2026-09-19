@@ -50,6 +50,7 @@ export function Resources() {
         <div className="grid">
           {(partners?.partners ?? []).map((p) => (
             <a className="card" key={p.id} href={p.website} target="_blank" rel="noreferrer">
+              {p.logo_url && <img className="partner-logo" src={p.logo_url} alt={p.name} loading="lazy" />}
               <h3>{p.name}</h3>
               <div className="meta"><span className="pill">{p.category}</span></div>
             </a>

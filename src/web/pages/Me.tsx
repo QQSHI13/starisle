@@ -9,7 +9,7 @@ import { Avatar } from "../Avatar";
 export default function Me() {
   const { t } = useLang();
   const nav = useNavigate();
-  const { me, refresh } = useMe();
+  const { me, refresh, logout } = useMe();
   const { data: proj } = useFetch<{ projects: any[] }>(me ? "/my/projects" : null, [me?.id]);
   const { data: notif } = useFetch<{ notifications: any[] }>(me ? "/notifications" : null, [me?.id]);
   const { data: enroll } = useFetch<{ enrollments: any[] }>(me ? "/my/courses" : null, [me?.id]);
@@ -22,7 +22,10 @@ export default function Me() {
   return (
     <div className="wrap" style={{ padding: "64px 24px" }}>
       <div className="page-head" style={{ padding: "0 0 28px" }}>
-        <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 14 }}><Avatar name={me.display_name} size={52} /> {me.display_name}</h1>
+        <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 14 }}>
+          <Avatar name={me.display_name} src={(me as any).avatar} size={52} /> {me.display_name}
+          <button className="btn small" style={{ marginLeft: "auto" }} onClick={() => { logout(); location.href = "/"; }}>退出登录</button>
+        </h1>
         <p className="sub">@{me.username}{me.role === "admin" ? " · admin" : ""}</p>
       </div>
 
