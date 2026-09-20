@@ -274,12 +274,12 @@ footer.site .legal { margin-top: 52px; padding-top: 20px; border-top: 1px solid 
   display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px;
   padding: 3px; gap: 2px; margin-bottom: 30px; background: var(--card);
 }
-.switch a {
+.switch a, .switch button {
   padding: 7px 20px; border-radius: 999px; font-size: 14px; color: var(--ink-2);
-  font-weight: 500; white-space: nowrap;
+  font-weight: 500; white-space: nowrap; background: none; border: 0; cursor: pointer;
 }
 .switch a:hover { color: var(--ink); }
-.switch a.active { background: var(--ink); color: var(--paper); }
+.switch a.active, .switch button.active { background: var(--ink); color: var(--paper); }
 
 .card-poster {
   width: calc(100% + 52px); margin: -26px -26px 8px;

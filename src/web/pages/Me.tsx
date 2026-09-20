@@ -31,15 +31,7 @@ export default function Me() {
       </div>
 
       <section style={{ padding: "36px 0" }}>
-        <div className="block-head"><h2>{t.notifications}</h2></div>
-        {(notif?.notifications ?? []).length === 0 && <p className="dim">—</p>}
-        {(notif?.notifications ?? []).map((n) => (
-          <div className="member-row" key={n.id}>
-            <span className={n.read ? "bio" : "dname"} style={n.read ? {} : { fontSize: 14 }}>{n.text}</span>
-            <span className="bio">{n.created_at}</span>
-            <button className="btn small danger" onClick={async () => { await api(`/notifications/${n.id}`, { method: "DELETE" }); location.reload(); }}>删除</button>
-          </div>
-        ))}
+        <NotificationManager />
       </section>
 
       <section style={{ padding: "0 0 36px" }}>
@@ -77,6 +69,42 @@ export default function Me() {
 
       <JoinInbox />
       <ProfileForm me={me} onSaved={refresh} />
+    </div>
+  );
+}
+
+function NotificationManager() {
+  const { t } = useLang();
+  const [tab, setTab] = useState<"all" | "unread">("all");
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ notifications: any[] }>("/notifications", [tick]);
+  const items = (data?.notifications ?? []).filter((n) => tab === "all" || !n.read);
+  const refresh = () => setTick((x) => x + 1);
+  const unread = (data?.notifications ?? []).filter((n) => !n.read).length;
+  return (
+    <div>
+      <div className="block-head" style={{ marginBottom: 14 }}>
+        <h2>{t.notifications}{unread > 0 ? ` · ${unread} 未读` : ""}</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div className="switch" style={{ marginBottom: 0, padding: 2 }}>
+            <button className={tab === "all" ? "active" : ""} onClick={() => setTab("all")}>全部</button>
+            <button className={tab === "unread" ? "active" : ""} onClick={() => setTab("unread")}>未读</button>
+          </div>
+          {unread > 0 && <button className="btn small" onClick={async () => { await api("/notifications/read", { method: "POST" }); refresh(); }}>{t.mark_all_read}</button>}
+        </div>
+      </div>
+      {items.length === 0 && <p className="dim">{tab === "unread" ? "没有未读消息。" : "暂无消息。"}</p>}
+      {items.map((n) => (
+        <div key={n.id} className="member-row">
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "transparent" : "var(--gold)", flex: "none", alignSelf: "center" }} />
+          <span className={n.read ? "bio" : ""} style={n.read ? {} : { fontWeight: 600 }}>{n.text}</span>
+          <span className="bio">{n.created_at.slice(0, 16)}</span>
+          <span style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+            <button className="btn small" onClick={async () => { await api(`/notifications/${n.id}/read`, { method: "POST" }); refresh(); }}>{n.read ? "标为未读" : "标为已读"}</button>
+            <button className="btn small danger" onClick={async () => { await api(`/notifications/${n.id}`, { method: "DELETE" }); refresh(); }}>{t.delete_msg}</button>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

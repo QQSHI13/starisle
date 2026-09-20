@@ -119,6 +119,9 @@ app.get("/api/projects/:slug", async (c) => {
     `SELECT tag FROM project_stacks WHERE project_id = ? ORDER BY id`).bind(p.id).all();
   const milestones = await c.env.DB.prepare(
     `SELECT text, done FROM project_milestones WHERE project_id = ? ORDER BY sort, id`).bind(p.id).all();
+  const followerCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM project_follows WHERE project_id = ?`).bind(p.id).first<any>();
+  const me = await currentUser(c);
+  const following = me ? await c.env.DB.prepare(`SELECT 1 x FROM project_follows WHERE project_id = ? AND member_id = ?`).bind(p.id, me.id).first() : null;
   const updates = await c.env.DB.prepare(
     `SELECT u.text, u.created_at, m.display_name AS author FROM project_updates u
      JOIN members m ON m.id = u.author_id WHERE u.project_id = ? ORDER BY u.created_at DESC LIMIT 20`).bind(p.id).all();
@@ -129,8 +132,48 @@ app.get("/api/projects/:slug", async (c) => {
     stack: stacks.results.map((s: any) => s.tag),
     milestones: milestones.results,
     updates: updates.results,
+    followers: followerCount?.n ?? 0,
+    following: !!following,
     repo_stats,
   });
+});
+
+app.post("/api/projects/:slug/follow", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const p = await c.env.DB.prepare(`SELECT id, owner_id FROM projects WHERE slug = ? AND status='approved'`).bind(c.req.param("slug")).first<any>();
+  if (!p) return err(c, 404, "project not found");
+  if (p.owner_id === m.id) return err(c, 400, "you own this project");
+  await c.env.DB.prepare(`INSERT OR IGNORE INTO project_follows (project_id, member_id) VALUES (?,?)`).bind(p.id, m.id).run();
+  return c.json({ ok: true });
+});
+
+app.delete("/api/projects/:slug/follow", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const p = await c.env.DB.prepare(`SELECT id FROM projects WHERE slug = ?`).bind(c.req.param("slug")).first<any>();
+  if (!p) return err(c, 404, "project not found");
+  await c.env.DB.prepare(`DELETE FROM project_follows WHERE project_id = ? AND member_id = ?`).bind(p.id, m.id).run();
+  return c.json({ ok: true });
+});
+
+app.post("/api/members/:username/follow", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const target = await c.env.DB.prepare(`SELECT id FROM members WHERE username = ? AND status='active'`).bind(c.req.param("username")).first<any>();
+  if (!target) return err(c, 404, "member not found");
+  if (target.id === m.id) return err(c, 400, "cannot follow yourself");
+  await c.env.DB.prepare(`INSERT OR IGNORE INTO member_follows (followee_id, follower_id) VALUES (?,?)`).bind(target.id, m.id).run();
+  return c.json({ ok: true });
+});
+
+app.delete("/api/members/:username/follow", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  await c.env.DB.prepare(
+    `DELETE FROM member_follows WHERE followee_id = (SELECT id FROM members WHERE username = ?) AND follower_id = ?`)
+    .bind(c.req.param("username"), m.id).run();
+  return c.json({ ok: true });
 });
 
 app.post("/api/projects/:slug/updates", async (c) => {
@@ -144,6 +187,18 @@ app.post("/api/projects/:slug/updates", async (c) => {
   const text = str(b?.text, 1000);
   if (!text) return err(c, 400, "update text required");
   await c.env.DB.prepare(`INSERT INTO project_updates (project_id, author_id, text) VALUES (?,?,?)`).bind(p.id, m.id, text).run();
+  await c.env.DB.prepare(
+    `INSERT INTO notifications (member_id, text)
+     SELECT DISTINCT f.member_id, ? || m.display_name || ? || p.name || ? || ?
+     FROM project_follows f JOIN projects p ON p.id = f.project_id JOIN members m ON m.id = ?
+     WHERE f.project_id = ? AND f.member_id != ?
+     UNION
+     SELECT DISTINCT mf.follower_id, ? || m2.display_name || ? || p2.name || ? || ?
+     FROM member_follows mf JOIN members m2 ON m2.id = mf.followee_id
+       JOIN projects p2 ON p2.id = ? JOIN members au ON au.id = m2.id
+     WHERE mf.followee_id = ? AND mf.follower_id != ?`)
+    .bind(``, ` posted an update on "`, `": `, text, m.id, p.id, m.id,
+          ``, ` posted an update on "`, `": `, text, p.id, m.id, m.id).run();
   return c.json({ ok: true }, 201);
 });
 
@@ -540,6 +595,13 @@ app.post("/api/notifications/read", async (c) => {
   const m = await currentUser(c);
   if (!m) return err(c, 401, "not logged in");
   await c.env.DB.prepare(`UPDATE notifications SET read = 1 WHERE member_id = ?`).bind(m.id).run();
+  return c.json({ ok: true });
+});
+
+app.post("/api/notifications/:id/read", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  await c.env.DB.prepare(`UPDATE notifications SET read = 1 - read WHERE id = ? AND member_id = ?`).bind(Number(c.req.param("id")), m.id).run();
   return c.json({ ok: true });
 });
 

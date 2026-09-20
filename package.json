@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "start": "bun src/server/node.ts",
+    "start:node": "node src/server/node.ts",
     "seed": "node scripts/fetch-seed.mjs && node scripts/hash-passwords.mjs",
     "db:reset": "wrangler d1 execute starisle --local --file=src/db/schema.sql && wrangler d1 execute starisle --local --file=src/db/seed.sql",
-    "demo": "npm run db:reset && npm run build && wrangler dev",
-    "worker:dev": "wrangler dev",
-    "typecheck": "tsc --noEmit",
-    "start": "node src/server/node.ts",
-    "build:aliyun": "npm run build && echo \"upload dist/, src/, package.json, package-lock.json; run: npm ci --omit=dev && npm run build && PORT=3000 node src/server/node.ts\""
+    "db:reset:remote": "wrangler d1 execute starisle --remote --file=src/db/schema.sql && wrangler d1 execute starisle --remote --file=src/db/seed.sql",
+    "demo": "rm -rf data dist && npm run seed && npm run build && bun src/server/node.ts",
+    "deploy": "wrangler deploy",
+    "worker:dev": "wrangler dev"
   },
   "dependencies": {
     "hono": "^4.6.0",

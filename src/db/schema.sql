@@ -221,3 +221,19 @@ CREATE INDEX IF NOT EXISTS idx_notif_member ON notifications(member_id);
 CREATE INDEX IF NOT EXISTS idx_updates_project ON project_updates(project_id);
 CREATE INDEX IF NOT EXISTS idx_joinreq_project ON join_requests(project_id);
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+
+CREATE TABLE IF NOT EXISTS project_follows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  UNIQUE (project_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pfollows_member ON project_follows(member_id);
+
+CREATE TABLE IF NOT EXISTS member_follows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  followee_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  follower_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  UNIQUE (followee_id, follower_id)
+);
+CREATE INDEX IF NOT EXISTS idx_mfollows_follower ON member_follows(follower_id);

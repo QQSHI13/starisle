@@ -53,7 +53,7 @@ export function Projects() {
 export function ProjectDetail() {
   const { slug } = useParams();
   const { t, lang } = useLang();
-  const { data, error } = useFetch<{ project: any; members: any[]; gaps: string[]; stack: string[]; milestones: any[]; updates: any[]; repo_stats: any }>(`/projects/${slug}`, [slug]);
+  const { data, error } = useFetch<{ project: any; members: any[]; gaps: string[]; stack: string[]; milestones: any[]; updates: any[]; repo_stats: any; followers: number; following: boolean }>(`/projects/${slug}`, [slug]);
   const { me, refresh } = useMe();
   const [sp] = useSearchParams();
   const editing = sp.get("edit") === "1";
@@ -128,6 +128,15 @@ export function ProjectDetail() {
             <h3>{t.gaps_title}</h3>
             <p>{data.gaps.map((g) => <span key={g} className="pill gap" style={{ marginRight: 8 }}>{g}</span>)}</p>
           </>
+        )}
+        {me && me.username !== p.owner_username && (
+          <p>
+            <button className="btn small" onClick={async () => {
+              await api(`/projects/${slug}/follow`, { method: data.following ? "DELETE" : "POST" });
+              location.reload();
+            }}>{data.following ? (lang === "zh" ? "已关注 ✓" : "Following ✓") : (lang === "zh" ? "关注这个项目" : "Follow")}</button>
+            <span className="dim" style={{ marginLeft: 10, fontSize: 13 }}>{data.followers} {lang === "zh" ? "人关注" : "followers"}</span>
+          </p>
         )}
         {me && (
           <div style={{ margin: "26px 0" }}>
