@@ -55,6 +55,7 @@ export default function Admin() {
         {projs && projs.length === 0 && <p className="dim">{t.no_items}</p>}
       </section>
 
+      <MentorQueue />
       <AdminTools />
       <section style={{ padding: "0 0 28px" }}>
         <h3>{t.admin_enroll}</h3>
@@ -77,6 +78,32 @@ function useFetchData<T>(path: string | null, enabled: boolean) {
   const res = useFetch<{ [k: string]: T }>(enabled && path ? path : null, [tick, enabled]);
   const key = path?.split("/").pop() ?? "";
   return { data: res.data ? (res.data as any)[key === "applications" ? "applications" : key === "projects" ? "projects" : "enrollments"] : null, refresh: () => setTick(tick + 1) };
+}
+
+function MentorQueue() {
+  const { t } = useLang();
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ requests: any[] }>("/admin/mentor-requests", [tick]);
+  const reqs = (data?.requests ?? []).filter((r: any) => r.status === "pending");
+  const decide = async (id: number, action: string) => {
+    await api(`/admin/mentor-requests/${id}`, { method: "POST", body: JSON.stringify({ action }) });
+    setTick((x) => x + 1);
+  };
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>指导申请 · Mentor requests</h3>
+      {reqs.length === 0 && <p className="dim">{t.no_items}</p>}
+      {reqs.map((r: any) => (
+        <div className="member-row" key={r.id}>
+          <span className="dname" style={{ fontSize: 15 }}>{r.member_name}</span>
+          <span className="bio">想跟 {r.mentor_name} 做:{r.interest}{r.questions ? ` · 问:${r.questions}` : ""}</span>
+          <button className="btn small primary" onClick={() => decide(r.id, "approve")}>通过</button>{" "}
+          <button className="btn small" onClick={() => decide(r.id, "contacted")}>已对接</button>{" "}
+          <button className="btn small danger" onClick={() => decide(r.id, "reject")}>{t.reject}</button>
+        </div>
+      ))}
+    </section>
+  );
 }
 
 function AdminTools() {

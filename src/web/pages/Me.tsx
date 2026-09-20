@@ -24,7 +24,8 @@ export default function Me() {
       <div className="page-head" style={{ padding: "0 0 28px" }}>
         <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 14 }}>
           <Avatar name={me.display_name} src={(me as any).avatar} size={52} /> {me.display_name}
-          <button className="btn small" style={{ marginLeft: "auto" }} onClick={() => { logout(); location.href = "/"; }}>退出登录</button>
+          {me.role === "admin" && <Link className="btn small primary" style={{ marginLeft: "auto" }} to="/admin">管理后台 →</Link>}
+          <button className="btn small" style={me.role === "admin" ? {} : { marginLeft: "auto" }} onClick={() => { logout(); location.href = "/"; }}>退出登录</button>
         </h1>
         <p className="sub">@{me.username}{me.role === "admin" ? " · admin" : ""}</p>
       </div>

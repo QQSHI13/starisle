@@ -701,6 +701,19 @@ app.get("/api/admin/mentor-requests", async (c) => {
   return c.json({ requests: results });
 });
 
+app.post("/api/admin/mentor-requests/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const action = b?.action === "approve" ? "approved" : b?.action === "contacted" ? "contacted" : "rejected";
+  const r = await c.env.DB.prepare(`SELECT * FROM mentor_requests WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!r) return err(c, 404, "not found");
+  await c.env.DB.prepare(`UPDATE mentor_requests SET status = ? WHERE id = ?`).bind(action, r.id).run();
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
+    .bind(r.member_id, `Your mentoring request was marked "${action}".`).run();
+  return c.json({ ok: true });
+});
+
 app.get("/api/admin/enrollments", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
