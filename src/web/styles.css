@@ -238,10 +238,11 @@ footer.site .legal { margin-top: 52px; padding-top: 20px; border-top: 1px solid 
   background: #c0392b; border-radius: 50%; border: 2px solid var(--paper);
 }
 .umenu-panel {
-  display: none; position: absolute; right: 0; top: calc(100% + 10px); width: 320px;
+  display: none; position: absolute; right: 0; top: calc(100% + 8px); width: 320px;
   background: var(--card); border: 1px solid var(--line-strong); border-radius: 8px;
   box-shadow: 0 12px 32px rgba(20, 18, 14, 0.18); z-index: 50; overflow: hidden;
 }
+.umenu-panel::before { content: ""; position: absolute; top: -8px; left: 0; right: 0; height: 8px; }
 .umenu:hover .umenu-panel, .umenu:focus-within .umenu-panel { display: block; }
 .umenu-head {
   display: flex; justify-content: space-between; align-items: center;

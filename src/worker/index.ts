@@ -89,7 +89,7 @@ app.get("/api/projects", async (c) => {
   const binds: string[] = [];
   if (q) { sql += ` AND (p.name LIKE ? OR p.tagline LIKE ?)`; binds.push(`%${q}%`, `%${q}%`); }
   if (domain) { sql += ` AND p.domain_id = ?`; binds.push(domain); }
-  sql += ` ORDER BY p.updated_at DESC`;
+  sql += ` ORDER BY p.featured DESC, p.updated_at DESC`;
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all();
   return c.json({ projects: results });
 });
@@ -606,6 +606,86 @@ app.post("/api/admin/projects/:id", async (c) => {
   await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
     .bind(p.owner_id, `Your project "${p.name}" was ${status}. ${str(b?.reason, 300) ?? ""}`.trim()).run();
   return c.json({ ok: true });
+});
+
+app.post("/api/admin/activities", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const title = str(b?.title, 120);
+  if (!title) return err(c, 400, "title required");
+  await c.env.DB.prepare(`INSERT INTO activities (title, description, starts_at, location) VALUES (?,?,?,?)`)
+    .bind(title, str(b?.description, 1000) ?? "", str(b?.starts_at, 40), str(b?.location, 120)).run();
+  return c.json({ ok: true }, 201);
+});
+
+app.delete("/api/admin/activities/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  await c.env.DB.prepare(`DELETE FROM activities WHERE id = ?`).bind(Number(c.req.param("id"))).run();
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/resources", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const name = str(b?.name, 120);
+  if (!name) return err(c, 400, "name required");
+  await c.env.DB.prepare(`INSERT INTO resources (name, description, status) VALUES (?,?, 'available')`)
+    .bind(name, str(b?.description, 1000) ?? "").run();
+  return c.json({ ok: true }, 201);
+});
+
+app.delete("/api/admin/resources/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  await c.env.DB.prepare(`DELETE FROM resources WHERE id = ?`).bind(Number(c.req.param("id"))).run();
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/projects/:id/feature", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const p = await c.env.DB.prepare(`SELECT featured FROM projects WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!p) return err(c, 404, "not found");
+  await c.env.DB.prepare(`UPDATE projects SET featured = ? WHERE id = ?`).bind(p.featured ? 0 : 1, Number(c.req.param("id"))).run();
+  return c.json({ featured: p.featured ? 0 : 1 });
+});
+
+app.post("/api/admin/columns", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const title = str(b?.title, 200);
+  const text = str(b?.text, 20000);
+  if (!title || !text) return err(c, 400, "title and text required");
+  const slug = "col-" + Math.random().toString(36).slice(2, 8);
+  await c.env.DB.prepare(
+    `INSERT INTO columns (slug, column_label, title, subtitle, author, author_title, text) VALUES (?,?,?,?,?,?,?)`)
+    .bind(slug, str(b?.column_label, 60) ?? "社区投稿", title, str(b?.subtitle, 300) ?? "", m.display_name, "", text).run();
+  return c.json({ slug }, 201);
+});
+
+app.post("/api/admin/announce", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const text = str(b?.text, 500);
+  if (!text) return err(c, 400, "text required");
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) SELECT id, ? FROM members WHERE status = 'active'`).bind(text).run();
+  return c.json({ ok: true }, 201);
+});
+
+app.get("/api/admin/mentor-requests", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.id, r.interest, r.background, r.questions, r.status, r.created_at,
+       mem.display_name AS member_name, mt.name AS mentor_name
+     FROM mentor_requests r JOIN members mem ON mem.id = r.member_id JOIN mentors mt ON mt.id = r.mentor_id
+     ORDER BY r.created_at DESC`).all();
+  return c.json({ requests: results });
 });
 
 app.get("/api/admin/enrollments", async (c) => {
