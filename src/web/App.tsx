@@ -121,7 +121,6 @@ function Layout({ children }: { children: ReactNode }) {
               <Link to="/apply">{t.apply}</Link>
               <Link to="/login">{t.login}</Link>
               <Link to="/account-recovery">{t.recovery}</Link>
-              <Link to="/privacy">{t.privacy_title}</Link>
             </nav>
           </div>
           <div className="legal">

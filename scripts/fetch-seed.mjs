@@ -13,6 +13,7 @@ async function get(path) {
 
 mkdirSync(new URL("../public/avatars", import.meta.url).pathname, { recursive: true });
 mkdirSync(new URL("../public/posters", import.meta.url).pathname, { recursive: true });
+mkdirSync(new URL("../public/partners", import.meta.url).pathname, { recursive: true });
 
 const dataUri = (v, dir, name) => {
   if (typeof v !== "string" || !v.startsWith("data:image")) return null;
@@ -114,7 +115,17 @@ for (const m of mentors) {
 }
 
 for (const p of partners) {
-  const logo = p.logo_path ? "https://forum.aiyf.org.cn" + p.logo_path.split(" ").map(encodeURIComponent).join(" ") : null;
+  let logo = null;
+  if (p.logo_path) {
+    try {
+      const ext = (p.logo_path.match(/\.(\w+)(?:\?|$)/) || [,"png"])[1].toLowerCase();
+      const res = await fetch(encodeURI("https://forum.aiyf.org.cn" + p.logo_path));
+      if (res.ok) {
+        writeFileSync(new URL(`../public/partners/${p.id}.${ext}`, import.meta.url).pathname, Buffer.from(await res.arrayBuffer()));
+        logo = `/partners/${p.id}.${ext}`;
+      }
+    } catch { logo = null; }
+  }
   L.push(`INSERT INTO partners (id,slug,name,category,website,logo_url,monogram) VALUES (${p.id},${esc(p.slug)},${esc(p.name)},${esc(p.category)},${esc(p.website)},${esc(logo)},${esc(p.monogram ?? "")}) ON CONFLICT(id) DO UPDATE SET logo_url=excluded.logo_url, website=excluded.website;`);
 }
 
