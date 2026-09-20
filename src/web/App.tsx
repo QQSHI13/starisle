@@ -40,7 +40,14 @@ function UserMenu() {
   const [items, setItems] = useState<any[]>([]);
   const refresh = () =>
     api("/notifications").then((d) => setItems(d.notifications)).catch(() => {});
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 20_000);
+    const onFocus = () => refresh();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { clearInterval(t); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
+  }, []);
   const unread = items.filter((n) => !n.read).length;
   const markAll = async () => { await api("/notifications/read", { method: "POST" }); refresh(); };
   return (
