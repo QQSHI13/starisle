@@ -43,6 +43,7 @@ export function Profile() {
           <Avatar name={m.display_name || m.username} src={m.avatar} size={52} /> {m.display_name}
         </h1>
         {m.bio && <p className="sub">{m.bio}</p>}
+        {m.website_url && <p className="sub"><a href={m.website_url} target="_blank" rel="noreferrer">{m.website_url}</a></p>}
         {m.repo_url && <p className="sub"><a href={m.repo_url} target="_blank" rel="noreferrer">{m.repo_url}</a></p>}
       </div></div>
       <section className="block"><div className="wrap">

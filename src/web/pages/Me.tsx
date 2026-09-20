@@ -76,6 +76,7 @@ export default function Me() {
         ))}
       </section>
 
+      <JoinInbox />
       <ProfileForm me={me} onSaved={refresh} />
     </div>
   );
@@ -130,9 +131,39 @@ function ProjectForm({ existing, onDone }: { existing?: any; onDone: () => void 
   );
 }
 
+function JoinInbox() {
+  const { t } = useLang();
+  const { data, refresh } = useJ();
+  const decide = async (id: number, action: string) => {
+    await api(`/my/join-requests/${id}`, { method: "POST", body: JSON.stringify({ action }) });
+    refresh();
+  };
+  const reqs = data?.requests ?? [];
+  if (reqs.length === 0) return null;
+  return (
+    <section style={{ padding: "0 0 36px" }}>
+      <div className="block-head"><h2>加入申请</h2></div>
+      {reqs.map((r: any) => (
+        <div className="member-row" key={r.id}>
+          <span className="dname" style={{ fontSize: 15 }}>{r.requester_name}</span>
+          <span className="bio">{r.name} — {r.message || "（无留言）"}</span>
+          <button className="btn small primary" onClick={() => decide(r.id, "approve")}>{t.approve}</button>{" "}
+          <button className="btn small danger" onClick={() => decide(r.id, "reject")}>{t.reject}</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function useJ() {
+  const [tick, setTick] = useState(0);
+  const res = useFetch<{ requests: any[] }>("/my/join-requests", [tick]);
+  return { data: res.data, refresh: () => setTick((x) => x + 1) };
+}
+
 function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
   const { t } = useLang();
-  const [f, setF] = useState({ display_name: me.display_name, bio: me.bio ?? "", repo_url: me.repo_url ?? "" });
+  const [f, setF] = useState({ display_name: me.display_name, bio: me.bio ?? "", repo_url: me.repo_url ?? "", website_url: (me as any).website_url ?? "" });
   const [msg, setMsg] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -149,6 +180,8 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
         <textarea rows={3} value={f.bio} onChange={(e: any) => setF({ ...f, bio: e.target.value })} /></label>
       <label className="field"><span>{t.repo_url}</span>
         <input type="text" value={f.repo_url} onChange={(e: any) => setF({ ...f, repo_url: e.target.value })} /></label>
+      <label className="field"><span>个人网站 · Personal website</span>
+        <input type="text" value={f.website_url} onChange={(e: any) => setF({ ...f, website_url: e.target.value })} /></label>
       <button className="btn" type="submit">{t.save}</button>
     </form>
   );

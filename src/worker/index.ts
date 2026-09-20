@@ -107,14 +107,80 @@ app.get("/api/projects/:slug", async (c) => {
     `SELECT tag FROM project_stacks WHERE project_id = ? ORDER BY id`).bind(p.id).all();
   const milestones = await c.env.DB.prepare(
     `SELECT text, done FROM project_milestones WHERE project_id = ? ORDER BY sort, id`).bind(p.id).all();
+  const updates = await c.env.DB.prepare(
+    `SELECT u.text, u.created_at, m.display_name AS author FROM project_updates u
+     JOIN members m ON m.id = u.author_id WHERE u.project_id = ? ORDER BY u.created_at DESC LIMIT 20`).bind(p.id).all();
   const repo_stats = await repoStatsFor(c, p);
   return c.json({
     project: p, members: members.results,
     gaps: gaps.results.map((g: any) => g.label),
     stack: stacks.results.map((s: any) => s.tag),
     milestones: milestones.results,
+    updates: updates.results,
     repo_stats,
   });
+});
+
+app.post("/api/projects/:slug/updates", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const p = await c.env.DB.prepare(`SELECT id, status FROM projects WHERE slug = ?`).bind(c.req.param("slug")).first<any>();
+  if (!p || p.status !== "approved") return err(c, 404, "project not found");
+  const member = await c.env.DB.prepare(`SELECT 1 x FROM project_members WHERE project_id = ? AND member_id = ?`).bind(p.id, m.id).first();
+  if (!member) return err(c, 403, "only project members can post updates");
+  const b = await c.req.json().catch(() => null);
+  const text = str(b?.text, 1000);
+  if (!text) return err(c, 400, "update text required");
+  await c.env.DB.prepare(`INSERT INTO project_updates (project_id, author_id, text) VALUES (?,?,?)`).bind(p.id, m.id, text).run();
+  return c.json({ ok: true }, 201);
+});
+
+app.post("/api/projects/:slug/join", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const p = await c.env.DB.prepare(`SELECT * FROM projects WHERE slug = ? AND status = 'approved'`).bind(c.req.param("slug")).first<any>();
+  if (!p) return err(c, 404, "project not found");
+  const isMember = await c.env.DB.prepare(`SELECT 1 x FROM project_members WHERE project_id = ? AND member_id = ?`).bind(p.id, m.id).first();
+  if (isMember) return err(c, 409, "already a member");
+  const b = await c.req.json().catch(() => null);
+  await c.env.DB.prepare(
+    `INSERT INTO join_requests (project_id, member_id, message) VALUES (?,?,?)
+     ON CONFLICT (project_id, member_id) DO UPDATE SET message = excluded.message, status = 'pending'`)
+    .bind(p.id, m.id, str(b?.message, 500) ?? "").run();
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
+    .bind(p.owner_id, `${m.display_name} requested to join "${p.name}". Review: /admin or project members.`).run();
+  return c.json({ ok: true }, 201);
+});
+
+app.get("/api/my/join-requests", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const { results } = await c.env.DB.prepare(
+    `SELECT j.id, j.message, j.status, j.created_at, p.slug, p.name, p.owner_id,
+       r.display_name AS requester_name, r.username AS requester_username
+     FROM join_requests j JOIN projects p ON p.id = j.project_id JOIN members r ON r.id = j.member_id
+     WHERE p.owner_id = ? AND j.status = 'pending' ORDER BY j.created_at DESC`).bind(m.id).all();
+  return c.json({ requests: results });
+});
+
+app.post("/api/my/join-requests/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const b = await c.req.json().catch(() => null);
+  const action = b?.action === "approve" ? "approved" : "rejected";
+  const j = await c.env.DB.prepare(
+    `SELECT j.*, p.owner_id, p.id AS pid, p.name FROM join_requests j JOIN projects p ON p.id = j.project_id WHERE j.id = ?`)
+    .bind(Number(c.req.param("id"))).first<any>();
+  if (!j || j.owner_id !== m.id) return err(c, 404, "not found");
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE join_requests SET status = ? WHERE id = ?`).bind(action, j.id),
+    ...(action === "approved"
+      ? [c.env.DB.prepare(`INSERT OR IGNORE INTO project_members (project_id, member_id, role) VALUES (?,?, 'member')`).bind(j.pid, j.member_id)]
+      : []),
+    c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
+      .bind(j.member_id, `Your request to join "${j.name}" was ${action}.`),
+  ]);
+  return c.json({ ok: true });
 });
 
 app.get("/api/courses", async (c) =>
@@ -141,14 +207,14 @@ app.get("/api/columns/:slug", async (c) => {
 
 app.get("/api/members", async (c) =>
   c.json({ members: (await c.env.DB.prepare(
-    `SELECT m.username, m.display_name, m.bio, m.repo_url, m.avatar, m.created_at,
+    `SELECT m.username, m.display_name, m.bio, m.repo_url, m.website_url, m.avatar, m.created_at,
        (SELECT COUNT(*) FROM project_members pm JOIN projects p ON p.id = pm.project_id
          WHERE pm.member_id = m.id AND p.status='approved') AS project_count
      FROM members m WHERE m.status = 'active' ORDER BY m.created_at DESC`).all()).results }));
 
 app.get("/api/members/:username", async (c) => {
   const m = await c.env.DB.prepare(
-    `SELECT username, display_name, bio, repo_url, avatar, created_at FROM members
+    `SELECT username, display_name, bio, repo_url, website_url, avatar, created_at FROM members
      WHERE username = ? AND status = 'active'`).bind(c.req.param("username")).first();
   if (!m) return err(c, 404, "member not found");
   const projects = await c.env.DB.prepare(
@@ -469,10 +535,10 @@ app.put("/api/me", async (c) => {
     if (taken) return err(c, 409, "username already taken");
   }
   await c.env.DB.prepare(
-    `UPDATE members SET display_name = ?, bio = ?, repo_url = ?,
+    `UPDATE members SET display_name = ?, bio = ?, repo_url = ?, website_url = ?,
        username = COALESCE(?, username) WHERE id = ?`)
     .bind(str(b?.display_name, 40) ?? m.display_name, str(b?.bio, 1000), str(b?.repo_url, 300),
-      str(b?.username, 40), m.id).run();
+      str(b?.website_url, 300) ?? null, str(b?.username, 40), m.id).run();
   return c.json({ ok: true });
 });
 

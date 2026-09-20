@@ -102,10 +102,7 @@ function Layout({ children }: { children: ReactNode }) {
             {me ? (
               <UserMenu />
             ) : (
-              <>
-                <Link className="btn small" to="/login">{t.login}</Link>
-                <Link className="btn small primary" to="/apply">{t.apply}</Link>
-              </>
+              <Link className="btn small primary" to="/apply">{t.apply}</Link>
             )}
           </div>
         </div>

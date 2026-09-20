@@ -5,6 +5,8 @@ import { useFetch } from "../hooks";
 import { ProjectCard } from "./Home";
 import { I } from "../icons";
 import { Avatar } from "../Avatar";
+import { api } from "../api";
+import { useMe } from "../App";
 
 export function Projects() {
   const { t, lang } = useLang();
@@ -50,7 +52,10 @@ export function Projects() {
 export function ProjectDetail() {
   const { slug } = useParams();
   const { t, lang } = useLang();
-  const { data, error } = useFetch<{ project: any; members: any[]; gaps: string[]; stack: string[]; milestones: any[]; repo_stats: any }>(`/projects/${slug}`, [slug]);
+  const { data, error } = useFetch<{ project: any; members: any[]; gaps: string[]; stack: string[]; milestones: any[]; updates: any[]; repo_stats: any }>(`/projects/${slug}`, [slug]);
+  const { me, refresh } = useMe();
+  const [msg, setMsg] = useState("");
+  const [note, setNote] = useState<string | null>(null);
   if (error) return <div className="err-full">{error}</div>;
   if (!data) return <div className="loading">{t.loading}</div>;
   const p = data.project;
@@ -109,6 +114,39 @@ export function ProjectDetail() {
           <>
             <h3>{t.gaps_title}</h3>
             <p>{data.gaps.map((g) => <span key={g} className="pill gap" style={{ marginRight: 8 }}>{g}</span>)}</p>
+          </>
+        )}
+        {me && (
+          <div style={{ margin: "26px 0" }}>
+            {note && <div className="notice" role="status">{note}</div>}
+            {data.members.some((mm: any) => mm.username === me.username) ? (
+              <form onSubmit={async (e) => { e.preventDefault(); if (!msg.trim()) return;
+                await api(`/projects/${slug}/updates`, { method: "POST", body: JSON.stringify({ text: msg }) });
+                setMsg(""); location.reload(); }}>
+                <label className="field"><span>{lang === "zh" ? "发布进展" : "Post an update"}</span>
+                  <textarea rows={2} value={msg} onChange={(e: any) => setMsg(e.target.value)} /></label>
+                <button className="btn small primary">{lang === "zh" ? "发布" : "Post"}</button>
+              </form>
+            ) : (
+              <form onSubmit={async (e) => { e.preventDefault();
+                await api(`/projects/${slug}/join`, { method: "POST", body: JSON.stringify({ message: msg }) });
+                setNote(lang === "zh" ? "已提交加入申请" : "Join request sent"); setMsg(""); refresh(); }}>
+                <label className="field"><span>{t.join_project}</span>
+                  <textarea rows={2} placeholder={lang === "zh" ? "给项目发起人留言（选填）" : "Message for the owner (optional)"} value={msg} onChange={(e: any) => setMsg(e.target.value)} /></label>
+                <button className="btn small primary">{t.join_project}</button>
+              </form>
+            )}
+          </div>
+        )}
+        {data.updates.length > 0 && (
+          <>
+            <h3>{lang === "zh" ? "项目动态" : "Updates"}</h3>
+            {data.updates.map((u, i) => (
+              <div key={i} className="mstone" style={{ borderBottom: "1px solid var(--line)" }}>
+                <span className="mtext" style={{ color: "var(--ink)" }}>{u.text}</span>
+                <span className="dim" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{u.author} · {u.created_at.slice(0, 16)}</span>
+              </div>
+            ))}
           </>
         )}
         {p.body && <div className="prose" style={{ padding: "24px 0" }}><p>{p.body}</p></div>}
