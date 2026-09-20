@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
 import { ProjectCard } from "./Home";
@@ -7,6 +7,7 @@ import { I } from "../icons";
 import { Avatar } from "../Avatar";
 import { api } from "../api";
 import { useMe } from "../App";
+import { ProjectForm } from "./ProjectForm";
 
 export function Projects() {
   const { t, lang } = useLang();
@@ -54,6 +55,8 @@ export function ProjectDetail() {
   const { t, lang } = useLang();
   const { data, error } = useFetch<{ project: any; members: any[]; gaps: string[]; stack: string[]; milestones: any[]; updates: any[]; repo_stats: any }>(`/projects/${slug}`, [slug]);
   const { me, refresh } = useMe();
+  const [sp] = useSearchParams();
+  const editing = sp.get("edit") === "1";
   const [msg, setMsg] = useState("");
   const [note, setNote] = useState<string | null>(null);
   if (error) return <div className="err-full">{error}</div>;
@@ -64,10 +67,20 @@ export function ProjectDetail() {
     <>
       <div className="page-head"><div className="wrap">
         <p className="kicker">{p.domain_name ?? t.nav_projects}</p>
-        <h1>{p.name}</h1>
+        <h1 style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
+          {p.name}
+          {me && me.username === p.owner_username && !editing && (
+            <a className="btn small" href={`/projects/${p.slug}?edit=1`}>{t.edit} ↗</a>
+          )}
+        </h1>
         {p.tagline && <p className="sub">{p.tagline}</p>}
         {p.poster_url && <img className="detail-poster" src={p.poster_url} alt={`${p.name} 展板`} />}
       </div></div>
+      {editing && me && me.username === p.owner_username && (
+        <section className="block"><div className="wrap">
+          <ProjectForm existing={p} onDone={() => location.assign(`/projects/${p.slug}`)} />
+        </div></section>
+      )}
       <section className="block"><div className="wrap">
         {data.stack.length > 0 && (
           <p>{data.stack.map((s) => <span key={s} className="pill" style={{ marginRight: 8 }}>{s}</span>)}</p>

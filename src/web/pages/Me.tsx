@@ -4,6 +4,7 @@ import { useLang } from "../i18n";
 import { api } from "../api";
 import { useMe } from "../App";
 import { useFetch } from "../hooks";
+import { ProjectForm } from "./ProjectForm";
 import { Avatar } from "../Avatar";
 
 export default function Me() {
@@ -14,7 +15,6 @@ export default function Me() {
   const { data: notif } = useFetch<{ notifications: any[] }>(me ? "/notifications" : null, [me?.id]);
   const { data: enroll } = useFetch<{ enrollments: any[] }>(me ? "/my/courses" : null, [me?.id]);
   const [showNew, setShowNew] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null);
 
   useEffect(() => { if (me === null) nav("/login"); }, [me]);
 
@@ -55,13 +55,10 @@ export default function Me() {
                 <p className="dim" style={{ margin: "6px 0 0", fontSize: 13 }}>{p.tagline}</p>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <button className="btn small" onClick={() => setEditing(editing === p.slug ? null : p.slug)}>{t.edit}</button>
+                <Link className="btn small" to={`/projects/${p.slug}?edit=1`}>{t.edit} →</Link>
               </div>
             </div>
-            {editing === p.slug && (
-              <ProjectForm existing={p} onDone={() => { setEditing(null); location.reload(); }} />
-            )}
-          </div>
+                      </div>
         ))}
       </section>
 
@@ -79,55 +76,6 @@ export default function Me() {
       <JoinInbox />
       <ProfileForm me={me} onSaved={refresh} />
     </div>
-  );
-}
-
-function ProjectForm({ existing, onDone }: { existing?: any; onDone: () => void }) {
-  const { t } = useLang();
-  const [f, setF] = useState({
-    name: existing?.name ?? "", tagline: existing?.tagline ?? "", body: existing?.body ?? "",
-    repo_url: existing?.repo_url ?? "", demo_url: existing?.demo_url ?? "", poster_url: existing?.poster_url ?? "", domain_id: existing?.domain_id ?? "",
-  });
-  const [err, setErr] = useState<string | null>(null);
-  const { data: domData } = useFetch<{ domains: any[] }>("/domains");
-  const submit = async (e: FormEvent) => {
-    e.preventDefault(); setErr(null);
-    try {
-      if (existing) await api(`/my/projects/${existing.slug}`, { method: "PUT", body: JSON.stringify(f) });
-      else await api("/my/projects", { method: "POST", body: JSON.stringify(f) });
-      onDone();
-    } catch (e: any) { setErr(String(e.message)); }
-  };
-  const del = async () => {
-    if (!existing || !confirm("Delete this project?")) return;
-    try { await api(`/my/projects/${existing.slug}`, { method: "DELETE" }); onDone(); }
-    catch (e: any) { setErr(String(e.message)); }
-  };
-  return (
-    <form onSubmit={submit} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 20, margin: "14px 0" }}>
-      {err && <div className="error-box" role="alert">{err}</div>}
-      <label className="field"><span>{t.project_name}</span>
-        <input type="text" required value={f.name} onChange={(e: any) => setF({ ...f, name: e.target.value })} /></label>
-      <label className="field"><span>{t.tagline}</span>
-        <input type="text" value={f.tagline} onChange={(e: any) => setF({ ...f, tagline: e.target.value })} /></label>
-      <label className="field"><span>{t.description}</span>
-        <textarea rows={3} value={f.body} onChange={(e: any) => setF({ ...f, body: e.target.value })} /></label>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <label className="field"><span>{t.repo}</span>
-          <input type="text" value={f.repo_url} onChange={(e: any) => setF({ ...f, repo_url: e.target.value })} /></label>
-        <label className="field"><span>{t.demo}</span>
-          <input type="text" value={f.demo_url} onChange={(e: any) => setF({ ...f, demo_url: e.target.value })} /></label>
-        <label className="field"><span>展板图片 URL · Poster image URL</span>
-          <input type="text" value={f.poster_url} onChange={(e: any) => setF({ ...f, poster_url: e.target.value })} /></label>
-      </div>
-      <label className="field"><span>{t.all_domains}</span>
-        <select value={f.domain_id} onChange={(e: any) => setF({ ...f, domain_id: e.target.value })}>
-          <option value="">—</option>
-          {(domData?.domains ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select></label>
-      <button className="btn primary" type="submit">{t.save}</button>
-      {existing && <button className="btn danger" type="button" style={{ marginLeft: 8 }} onClick={del}>{t.delete}</button>}
-    </form>
   );
 }
 
@@ -163,7 +111,7 @@ function useJ() {
 
 function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
   const { t } = useLang();
-  const [f, setF] = useState({ display_name: me.display_name, bio: me.bio ?? "", repo_url: me.repo_url ?? "", website_url: (me as any).website_url ?? "" });
+  const [f, setF] = useState({ display_name: me.display_name, bio: me.bio ?? "", website_url: (me as any).website_url ?? "" });
   const [msg, setMsg] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -178,8 +126,6 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
         <input type="text" value={f.display_name} onChange={(e: any) => setF({ ...f, display_name: e.target.value })} /></label>
       <label className="field"><span>Bio</span>
         <textarea rows={3} value={f.bio} onChange={(e: any) => setF({ ...f, bio: e.target.value })} /></label>
-      <label className="field"><span>{t.repo_url}</span>
-        <input type="text" value={f.repo_url} onChange={(e: any) => setF({ ...f, repo_url: e.target.value })} /></label>
       <label className="field"><span>个人网站 · Personal website</span>
         <input type="text" value={f.website_url} onChange={(e: any) => setF({ ...f, website_url: e.target.value })} /></label>
       <button className="btn" type="submit">{t.save}</button>

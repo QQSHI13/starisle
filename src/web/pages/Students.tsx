@@ -44,7 +44,7 @@ export function Profile() {
         </h1>
         {m.bio && <p className="sub">{m.bio}</p>}
         {m.website_url && <p className="sub"><a href={m.website_url} target="_blank" rel="noreferrer">{m.website_url}</a></p>}
-        {m.repo_url && <p className="sub"><a href={m.repo_url} target="_blank" rel="noreferrer">{m.repo_url}</a></p>}
+
       </div></div>
       <section className="block"><div className="wrap">
         <h3>{t.projects_of}</h3>

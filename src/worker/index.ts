@@ -110,7 +110,7 @@ app.get("/api/projects/:slug", async (c) => {
   const updates = await c.env.DB.prepare(
     `SELECT u.text, u.created_at, m.display_name AS author FROM project_updates u
      JOIN members m ON m.id = u.author_id WHERE u.project_id = ? ORDER BY u.created_at DESC LIMIT 20`).bind(p.id).all();
-  const repo_stats = await repoStatsFor(c, p);
+  const repo_stats = await repoStatsFor(c as any, p);
   return c.json({
     project: p, members: members.results,
     gaps: gaps.results.map((g: any) => g.label),
@@ -443,20 +443,26 @@ async function fetchRepoStats(repoUrl: string): Promise<Record<string, unknown> 
   }
 }
 
-async function repoStatsFor(c: { env: Bindings }, project: any) {
+async function repoStatsFor(c: { env: Bindings; executionCtx?: ExecutionContext }, project: any) {
   if (!project.repo_url) return null;
   const cached = await c.env.DB.prepare(
     `SELECT data, fetched_at FROM repo_cache WHERE project_id = ?`).bind(project.id).first<any>();
-  if (cached && cached.fetched_at > new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 19).replace("T", " "))
-    return JSON.parse(cached.data);
-  const stats = await fetchRepoStats(project.repo_url);
-  if (stats && !stats.error) {
-    await c.env.DB.prepare(
-      `INSERT INTO repo_cache (project_id, data, fetched_at) VALUES (?,?, datetime('now'))
-       ON CONFLICT (project_id) DO UPDATE SET data = excluded.data, fetched_at = datetime('now')`)
-      .bind(project.id, JSON.stringify(stats)).run();
-  }
-  return stats ?? (cached ? JSON.parse(cached.data) : null);
+  const fresh = cached && cached.fetched_at > new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 19).replace("T", " ");
+  if (fresh) return JSON.parse(cached.data);
+  // stale or missing: refresh in the background, serve what we have (never block the page on upstream)
+  const refresh = (async () => {
+    const stats = await fetchRepoStats(project.repo_url);
+    if (stats && !stats.error) {
+      await c.env.DB.prepare(
+        `INSERT INTO repo_cache (project_id, data, fetched_at) VALUES (?,?, datetime('now'))
+         ON CONFLICT (project_id) DO UPDATE SET data = excluded.data, fetched_at = datetime('now')`)
+        .bind(project.id, JSON.stringify(stats)).run();
+    }
+  })();
+  if (cached) c.executionCtx?.waitUntil(refresh);
+  else await refresh;
+  const after = await c.env.DB.prepare(`SELECT data FROM repo_cache WHERE project_id = ?`).bind(project.id).first<any>();
+  return after ? JSON.parse(after.data) : null;
 }
 
 const slugify = (name: string) =>
