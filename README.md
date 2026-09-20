@@ -25,7 +25,8 @@ npx wrangler dev    # serve API + SPA on :8787
 ## Demo accounts
 
 All seeded accounts (including every imported member) use the dev password **`starisle-dev`**.
-Two extra accounts: admin `施清荃` / `演示成员` (Demo Member). The admin can review applications, projects and course requests at `/admin`.
+Demo accounts: admin `演示管理员` (Demo Admin, role=admin — reviews applications/projects/course requests at `/admin`),
+and `演示成员` (Demo Member). Imported members keep their real names/roles (no admin rights).
 
 ## Features
 
@@ -46,3 +47,12 @@ wrangler.toml   worker + D1 + static assets config
 ```
 
 Not deployed on purpose — `wrangler deploy` when ready.
+
+## Integrating with the original site
+
+This rebuild is designed to be adopted piecemeal by the original team:
+
+- **Mount under a path**: `BASE_PATH=/v2 npm run build` makes the SPA run at `https://forum.aiyf.org.cn/v2/` (router basename + asset base adjust automatically). Deploy the worker on the same Cloudflare account and add a `forum.aiyf.org.cn/v2/*` route.
+- **API prefix**: all endpoints live under `/api/*`; set the worker's `API_PREFIX` var (default `/api`) if the original site needs `/api/v2/*` during a transition window. The frontend calls same-origin paths only, so a proxy rule on the origin is enough — no CORS changes needed.
+- **Data migration**: `npm run seed` re-harvests everything from the legacy API into D1; run it once against production D1 to import live data, then point the frontend at the new worker.
+- **Session coexistence**: the session cookie is named `sid` and is path-scoped; it won't collide with the original site's cookie.

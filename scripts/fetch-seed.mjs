@@ -66,7 +66,7 @@ for (const m of members) {
 
 // demo/admin accounts (documented credentials, dev only)
 L.push(
-  `INSERT OR IGNORE INTO members (username,display_name,email,bio,password_hash,salt,role) VALUES ('施清荃','QQSHI13','demo@starisle.local','Demo member account.','__HASH__','__SALT__','admin');`
+  `INSERT INTO members (username,display_name,email,bio,password_hash,salt) VALUES ('施清荃','QQSHI13','demo@starisle.local','Imported member.','__HASH__','__SALT__') ON CONFLICT(username) DO NOTHING;`
 );
 L.push(
   `INSERT OR IGNORE INTO members (username,display_name,email,bio,password_hash,salt,role) VALUES ('演示成员','Demo Member','member@starisle.local','Demo member account.','__HASH__','__SALT__','member');`
