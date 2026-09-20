@@ -543,6 +543,13 @@ app.post("/api/notifications/read", async (c) => {
   return c.json({ ok: true });
 });
 
+app.delete("/api/notifications/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  await c.env.DB.prepare(`DELETE FROM notifications WHERE id = ? AND member_id = ?`).bind(Number(c.req.param("id")), m.id).run();
+  return c.json({ ok: true });
+});
+
 app.put("/api/me", async (c) => {
   const m = await currentUser(c);
   if (!m) return err(c, 401, "not logged in");

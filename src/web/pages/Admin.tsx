@@ -109,10 +109,10 @@ function MentorQueue() {
 function AdminTools() {
   const { t } = useLang();
   const [msg, setMsg] = useState<string | null>(null);
-  const post = (path: string, body: any, ok: string) => async (e: any) => {
+  const post = (path: string, body: any, ok: string, clear: () => void) => async (e: any) => {
     e.preventDefault();
     setMsg(null);
-    try { await api(path, { method: "POST", body: JSON.stringify(body) }); setMsg(ok); } catch (e: any) { setMsg(String(e.message)); }
+    try { await api(path, { method: "POST", body: JSON.stringify(body) }); setMsg(ok); clear(); } catch (e: any) { setMsg(String(e.message)); }
   };
   const [aTitle, setATitle] = useState(""); const [aDesc, setADesc] = useState(""); const [aWhen, setAWhen] = useState("");
   const [rName, setRName] = useState(""); const [rDesc, setRDesc] = useState("");
@@ -122,7 +122,7 @@ function AdminTools() {
     <section style={{ padding: "0 0 28px" }}>
       <h3>站点运营 · Site operations</h3>
       {msg && <div className="notice" role="status">{msg}</div>}
-      <form onSubmit={post("/admin/activities", { title: aTitle, description: aDesc, starts_at: aWhen }, "活动已发布")} style={{ marginBottom: 22 }}>
+      <form onSubmit={post("/admin/activities", { title: aTitle, description: aDesc, starts_at: aWhen }, "活动已发布", () => { setATitle(""); setADesc(""); setAWhen(""); })} style={{ marginBottom: 22 }}>
         <b>发布活动</b>
         <div className="toolbar" style={{ marginTop: 8 }}>
           <input type="text" placeholder="标题" value={aTitle} onChange={(e: any) => setATitle(e.target.value)} style={{ width: 180 }} required />
@@ -131,7 +131,7 @@ function AdminTools() {
           <button className="btn small primary">发布</button>
         </div>
       </form>
-      <form onSubmit={post("/admin/resources", { name: rName, description: rDesc }, "资源已上架")} style={{ marginBottom: 22 }}>
+      <form onSubmit={post("/admin/resources", { name: rName, description: rDesc }, "资源已上架", () => { setRName(""); setRDesc(""); })} style={{ marginBottom: 22 }}>
         <b>上架资源</b>
         <div className="toolbar" style={{ marginTop: 8 }}>
           <input type="text" placeholder="名称" value={rName} onChange={(e: any) => setRName(e.target.value)} style={{ width: 180 }} required />
@@ -139,7 +139,7 @@ function AdminTools() {
           <button className="btn small primary">上架</button>
         </div>
       </form>
-      <form onSubmit={post("/admin/columns", { title: cTitle, text: cText }, "专栏已发布")} style={{ marginBottom: 22 }}>
+      <form onSubmit={post("/admin/columns", { title: cTitle, text: cText }, "专栏已发布", () => { setCTitle(""); setCText(""); })} style={{ marginBottom: 22 }}>
         <b>发布专栏</b>
         <div style={{ marginTop: 8, maxWidth: 560 }}>
           <input type="text" placeholder="标题" value={cTitle} onChange={(e: any) => setCTitle(e.target.value)} required style={{ marginBottom: 8 }} />
@@ -147,7 +147,7 @@ function AdminTools() {
           <button className="btn small primary" style={{ marginTop: 8 }}>发布</button>
         </div>
       </form>
-      <form onSubmit={post("/admin/announce", { text: ann }, "已广播给全体成员")}>
+      <form onSubmit={post("/admin/announce", { text: ann }, "已广播给全体成员", () => setAnn(""))}>
         <b>全员通知</b>
         <div className="toolbar" style={{ marginTop: 8 }}>
           <input type="text" placeholder="通知内容" value={ann} onChange={(e: any) => setAnn(e.target.value)} style={{ width: 420 }} required />

@@ -52,7 +52,7 @@ function UserMenu() {
       <div className="umenu-panel" role="menu">
         <div className="umenu-head">
           <span>{t.notifications}{unread > 0 ? ` · ${unread}` : ""}</span>
-          {unread > 0 && <button className="umenu-link" onClick={markAll}>{lang_allread(t)}</button>}
+          {unread > 0 && <button className="umenu-link" onClick={markAll}>{t.mark_all_read}</button>}
         </div>
         {items.length === 0 && <div className="umenu-empty">—</div>}
         {items.slice(0, 5).map((n) => (
@@ -70,7 +70,6 @@ function UserMenu() {
   );
 }
 
-const lang_allread = (t: any) => (t.language === "中文" ? "全部已读" : "Mark all read");
 
 function Layout({ children }: { children: ReactNode }) {
   const { t, toggle, toggleTheme, theme, lang } = useLang();

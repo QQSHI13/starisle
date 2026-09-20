@@ -37,6 +37,7 @@ export default function Me() {
           <div className="member-row" key={n.id}>
             <span className={n.read ? "bio" : "dname"} style={n.read ? {} : { fontSize: 14 }}>{n.text}</span>
             <span className="bio">{n.created_at}</span>
+            <button className="btn small danger" onClick={async () => { await api(`/notifications/${n.id}`, { method: "DELETE" }); location.reload(); }}>删除</button>
           </div>
         ))}
       </section>

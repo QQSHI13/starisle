@@ -49,7 +49,7 @@ const zh = {
   privacy_title: "隐私与未成年人说明",
   not_found: "你要找的页面不存在。", back_home: "返回首页",
   footer_tag: "代码留在开源仓库，星屿负责成员、项目与连接。邀请制入驻，人工审核——未成年人的安全，优先于一切功能。",
-  footer_browse: "站内导航", loading: "载入中…", error: "出错了，请稍后重试", language: "EN", theme_dark: "深色", theme_light: "浅色",
+  footer_browse: "站内导航", mark_all_read: "全部标为已读", delete_msg: "删除", loading: "载入中…", error: "出错了，请稍后重试", language: "EN", theme_dark: "深色", theme_light: "浅色",
 };
 
 export type Lang = "zh" | "en";
@@ -103,7 +103,7 @@ export const en: Record<keyof typeof zh, string> = {
   privacy_title: "Privacy & minors",
   not_found: "That page doesn't exist.", back_home: "Back to the homepage",
   footer_tag: "Code lives in open repositories; Starisle is where members, projects and introductions happen. Invite-only, human-reviewed — minors' safety comes before every feature.",
-  footer_browse: "Navigate", loading: "Loading…", error: "Something went wrong — please try again", language: "中文", theme_dark: "Dark", theme_light: "Light",
+  footer_browse: "Navigate", mark_all_read: "Mark all read", delete_msg: "Delete", loading: "Loading…", error: "Something went wrong — please try again", language: "中文", theme_dark: "Dark", theme_light: "Light",
 };
 
 type Dict = typeof zh;
