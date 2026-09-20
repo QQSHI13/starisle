@@ -8,8 +8,18 @@ import { gzipSync, constants as z } from "node:zlib";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 // SQLite: prefers node:sqlite (Node >= 22.13), falls back to bun:sqlite (Bun)
-const { DatabaseSync } = (await import("node:sqlite").catch(() => null as any)) ??
-  ((await import("bun:sqlite" as any).catch(() => { throw new Error("need Node >= 22.13 or Bun"); })) as any);
+type DBClass = new (path: string) => any;
+let DatabaseSync: DBClass;
+{
+  const ns: any = await import("node:sqlite").catch(() => null as any);
+  if (ns?.DatabaseSync) {
+    DatabaseSync = ns.DatabaseSync;
+  } else {
+    const bun: any = await import("bun:sqlite" as any).catch(() => null as any);
+    if (!bun?.Database) throw new Error("need Node >= 22.13 or Bun");
+    DatabaseSync = bun.Database;
+  }
+}
 import app from "../worker/index.ts";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
