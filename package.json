@@ -10,7 +10,9 @@
     "db:reset": "wrangler d1 execute starisle --local --file=src/db/schema.sql && wrangler d1 execute starisle --local --file=src/db/seed.sql",
     "demo": "npm run db:reset && npm run build && wrangler dev",
     "worker:dev": "wrangler dev",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start": "node src/server/node.ts",
+    "build:aliyun": "npm run build && echo \"upload dist/, src/, package.json, package-lock.json; run: npm ci --omit=dev && npm run build && PORT=3000 node src/server/node.ts\""
   },
   "dependencies": {
     "hono": "^4.6.0",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260918.1",
+    "@types/node": "^26.6.2",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.1.1",

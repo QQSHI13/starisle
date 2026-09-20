@@ -210,3 +210,12 @@ CREATE TABLE IF NOT EXISTS join_requests (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (project_id, member_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_pm_member ON project_members(member_id);
+CREATE INDEX IF NOT EXISTS idx_pm_project ON project_members(project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_notif_member ON notifications(member_id);
+CREATE INDEX IF NOT EXISTS idx_updates_project ON project_updates(project_id);
+CREATE INDEX IF NOT EXISTS idx_joinreq_project ON join_requests(project_id);
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);

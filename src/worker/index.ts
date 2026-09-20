@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { secureHeaders } from "hono/secure-headers";
 import type { D1Database } from "@cloudflare/workers-types";
 
 type Bindings = { DB: D1Database; ASSETS: Fetcher };
@@ -10,7 +11,18 @@ type Member = {
   password_hash: string; salt: string;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: Bindings & { COOKIE_SECURE?: string } }>();
+app.use(secureHeaders({
+  contentSecurityPolicy: {
+    defaultSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    fontSrc: ["'self'", "https://fonts.gstatic.com"],
+    imgSrc: ["'self'", "data:"],
+    connectSrc: ["'self'"],
+  },
+  permissionsPolicy: { camera: [], microphone: [], geolocation: [] },
+  crossOriginResourcePolicy: false,
+}));
 const SESSION_DAYS = 30;
 
 // ---------- helpers ----------
@@ -290,6 +302,7 @@ async function createSession(c: any, memberId: number) {
     .bind(token, memberId).run();
   setCookie(c, "sid", token, {
     httpOnly: true, sameSite: "Lax", path: "/",
+    secure: c.env.COOKIE_SECURE !== "0",
     maxAge: SESSION_DAYS * 86400,
   });
 }
