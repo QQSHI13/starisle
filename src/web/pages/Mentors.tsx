@@ -48,7 +48,7 @@ export default function Mentors() {
         </div>
         {err && <div className="error-box" role="alert">{err}</div>}
         {msg && <div className="notice" role="status">{msg}</div>}
-        <div className="grid">
+        <div className="grid align-start">
           {mentors.map((m) => (
             <div className="card" key={m.id}>
               <h3 style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={m.name} /> {m.name}</h3>
