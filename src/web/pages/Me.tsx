@@ -75,36 +75,64 @@ export default function Me() {
 
 function NotificationManager() {
   const { t } = useLang();
-  const [tab, setTab] = useState<"all" | "unread">("all");
+  const [view, setView] = useState<"inbox" | "saved" | "done">("inbox");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [q, setQ] = useState("");
   const [tick, setTick] = useState(0);
   const { data } = useFetch<{ notifications: any[] }>("/notifications", [tick]);
-  const items = (data?.notifications ?? []).filter((n) => tab === "all" || !n.read);
+  const all = data?.notifications ?? [];
   const refresh = () => setTick((x) => x + 1);
-  const unread = (data?.notifications ?? []).filter((n) => !n.read).length;
+  const unread = all.filter((n) => !n.read).length;
+  const TYPE_LABEL: Record<string, [string, string]> = {
+    update: ["项目动态", "project updates"], join: ["加入", "joins"], application: ["申请", "applications"],
+    project: ["项目审核", "project review"], course: ["课程", "courses"], mentor: ["导师", "mentoring"],
+    announce: ["公告", "announcements"], general: ["其他", "other"],
+  };
+  const typeLabel = (k: string) => (TYPE_LABEL[k] ?? TYPE_LABEL.general)[t.language === "中文" ? 1 : 0];
+  const types = [...new Set(all.map((n) => n.type))];
+  let items = view === "inbox" ? all.filter((n) => !n.read) : view === "saved" ? all.filter((n) => n.saved) : all.filter((n) => n.read && !n.saved);
+  if (typeFilter !== "all") items = items.filter((n) => n.type === typeFilter);
+  if (q.trim()) items = items.filter((n) => n.text.toLowerCase().includes(q.trim().toLowerCase()));
+  const counts = { inbox: unread, saved: all.filter((n) => n.saved).length, done: all.filter((n) => n.read).length };
+
   return (
-    <div>
-      <div className="block-head" style={{ marginBottom: 14 }}>
-        <h2>{t.notifications}{unread > 0 ? ` · ${unread} 未读` : ""}</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div className="switch" style={{ marginBottom: 0, padding: 2 }}>
-            <button className={tab === "all" ? "active" : ""} onClick={() => setTab("all")}>全部</button>
-            <button className={tab === "unread" ? "active" : ""} onClick={() => setTab("unread")}>未读</button>
-          </div>
+    <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: 32, alignItems: "start" }}>
+      <nav aria-label="notification views" style={{ position: "sticky", top: 90 }}>
+        {([["inbox", "收件箱"], ["saved", "已保存"], ["done", "已完成"]] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setView(k)} style={{
+            display: "flex", width: "100%", justifyContent: "space-between", padding: "8px 12px",
+            background: view === k ? "var(--gold-soft)" : "none", border: 0, borderRadius: 4,
+            cursor: "pointer", fontSize: 14, fontWeight: view === k ? 600 : 400, color: "var(--ink)",
+          }}>
+            <span>{label}</span><span className="dim">{counts[k]}</span>
+          </button>
+        ))}
+        <div className="dim" style={{ fontSize: 11, letterSpacing: "0.1em", margin: "14px 0 4px", textTransform: "uppercase" }}>筛选</div>
+        <button onClick={() => setTypeFilter("all")} className="dim" style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 12px", background: "none", border: 0, cursor: "pointer", fontSize: 13, color: typeFilter === "all" ? "var(--gold)" : undefined, fontWeight: typeFilter === "all" ? 600 : 400 }}>全部类型</button>
+        {types.map((ty) => (
+          <button key={ty} onClick={() => setTypeFilter(ty)} style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 12px", background: "none", border: 0, cursor: "pointer", fontSize: 13, color: typeFilter === ty ? "var(--gold)" : "var(--ink-2)", fontWeight: typeFilter === ty ? 600 : 400 }}>{typeLabel(ty)}</button>
+        ))}
+      </nav>
+      <div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <input type="text" placeholder="搜索消息…" value={q} onChange={(e: any) => setQ(e.target.value)} style={{ width: 220 }} aria-label="搜索消息" />
           {unread > 0 && <button className="btn small" onClick={async () => { await api("/notifications/read", { method: "POST" }); refresh(); }}>{t.mark_all_read}</button>}
         </div>
+        {items.length === 0 && <p className="dim">{view === "inbox" ? "没有未读消息 — 全处理完了。" : view === "saved" ? "没有已保存的消息。" : "没有已完成的消息。"}</p>}
+        {items.map((n) => (
+          <div key={n.id} className="member-row" style={{ gap: 10 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "transparent" : "var(--gold)", flex: "none", alignSelf: "center" }} />
+            <span className="pill" style={{ flex: "none" }}>{typeLabel(n.type)}</span>
+            <span style={n.read ? { color: "var(--ink-3)" } : { fontWeight: 600 }}>{n.text}</span>
+            <span className="bio">{n.created_at.slice(0, 16)}</span>
+            <span style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+              {!n.read && <button className="btn small" title="完成" onClick={async () => { await api(`/notifications/${n.id}/read`, { method: "POST" }); refresh(); }}>✓</button>}
+              <button className="btn small" title={n.saved ? "取消保存" : "保存"} onClick={async () => { await api(`/notifications/${n.id}/save`, { method: "POST" }); refresh(); }}>{n.saved ? "★" : "☆"}</button>
+              <button className="btn small danger" onClick={async () => { await api(`/notifications/${n.id}`, { method: "DELETE" }); refresh(); }}>🗑</button>
+            </span>
+          </div>
+        ))}
       </div>
-      {items.length === 0 && <p className="dim">{tab === "unread" ? "没有未读消息。" : "暂无消息。"}</p>}
-      {items.map((n) => (
-        <div key={n.id} className="member-row">
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "transparent" : "var(--gold)", flex: "none", alignSelf: "center" }} />
-          <span className={n.read ? "bio" : ""} style={n.read ? {} : { fontWeight: 600 }}>{n.text}</span>
-          <span className="bio">{n.created_at.slice(0, 16)}</span>
-          <span style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-            <button className="btn small" onClick={async () => { await api(`/notifications/${n.id}/read`, { method: "POST" }); refresh(); }}>{n.read ? "标为未读" : "标为已读"}</button>
-            <button className="btn small danger" onClick={async () => { await api(`/notifications/${n.id}`, { method: "DELETE" }); refresh(); }}>{t.delete_msg}</button>
-          </span>
-        </div>
-      ))}
     </div>
   );
 }

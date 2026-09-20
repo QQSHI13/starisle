@@ -188,15 +188,15 @@ app.post("/api/projects/:slug/updates", async (c) => {
   if (!text) return err(c, 400, "update text required");
   await c.env.DB.prepare(`INSERT INTO project_updates (project_id, author_id, text) VALUES (?,?,?)`).bind(p.id, m.id, text).run();
   await c.env.DB.prepare(
-    `INSERT INTO notifications (member_id, text)
+    `INSERT INTO notifications (member_id, text, type)
      SELECT DISTINCT f.member_id, ? || m.display_name || ? || p.name || ? || ?
      FROM project_follows f JOIN projects p ON p.id = f.project_id JOIN members m ON m.id = ?
-     WHERE f.project_id = ? AND f.member_id != ?
+     , 'update' WHERE f.project_id = ? AND f.member_id != ?
      UNION
      SELECT DISTINCT mf.follower_id, ? || m2.display_name || ? || p2.name || ? || ?
      FROM member_follows mf JOIN members m2 ON m2.id = mf.followee_id
        JOIN projects p2 ON p2.id = ? JOIN members au ON au.id = m2.id
-     WHERE mf.followee_id = ? AND mf.follower_id != ?`)
+     , 'update' WHERE mf.followee_id = ? AND mf.follower_id != ?`)
     .bind(``, ` posted an update on "`, `": `, text, m.id, p.id, m.id,
           ``, ` posted an update on "`, `": `, text, p.id, m.id, m.id).run();
   return c.json({ ok: true }, 201);
@@ -214,7 +214,7 @@ app.post("/api/projects/:slug/join", async (c) => {
     `INSERT INTO join_requests (project_id, member_id, message) VALUES (?,?,?)
      ON CONFLICT (project_id, member_id) DO UPDATE SET message = excluded.message, status = 'pending'`)
     .bind(p.id, m.id, str(b?.message, 500) ?? "").run();
-  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
     .bind(p.owner_id, `${m.display_name} requested to join "${p.name}". Review: /admin or project members.`).run();
   return c.json({ ok: true }, 201);
 });
@@ -244,7 +244,7 @@ app.post("/api/my/join-requests/:id", async (c) => {
     ...(action === "approved"
       ? [c.env.DB.prepare(`INSERT OR IGNORE INTO project_members (project_id, member_id, role) VALUES (?,?, 'member')`).bind(j.pid, j.member_id)]
       : []),
-    c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
+    c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
       .bind(j.member_id, `Your request to join "${j.name}" was ${action}.`),
   ]);
   return c.json({ ok: true });
@@ -598,6 +598,13 @@ app.post("/api/notifications/read", async (c) => {
   return c.json({ ok: true });
 });
 
+app.post("/api/notifications/:id/save", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  await c.env.DB.prepare(`UPDATE notifications SET saved = 1 - saved WHERE id = ? AND member_id = ?`).bind(Number(c.req.param("id")), m.id).run();
+  return c.json({ ok: true });
+});
+
 app.post("/api/notifications/:id/read", async (c) => {
   const m = await currentUser(c);
   if (!m) return err(c, 401, "not logged in");
@@ -655,8 +662,8 @@ app.post("/api/admin/applications/:id", async (c) => {
        VALUES (?,?,?,?,?,?,?)`)
       .bind(a.username, a.display_name, a.email, a.repo_url, null, a.password_hash, a.salt).run();
     await c.env.DB.prepare(
-      `INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
-      .bind(r.meta.last_row_id, "Your application has been approved. Welcome to Starisle.").run();
+      `INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
+      .bind(r.meta.last_row_id, "Your application has been approved. Welcome to Starisle.", "application").run();
     await c.env.DB.prepare(`UPDATE applications SET status = 'approved' WHERE id = ?`).bind(a.id).run();
   } else {
     await c.env.DB.prepare(`UPDATE applications SET status = 'rejected', reason = ? WHERE id = ?`)
@@ -685,7 +692,7 @@ app.post("/api/admin/projects/:id", async (c) => {
   const status = action === "approve" ? "approved" : action === "reject" ? "rejected" : "pending";
   await c.env.DB.prepare(`UPDATE projects SET status = ?, updated_at = datetime('now') WHERE id = ?`)
     .bind(status, p.id).run();
-  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
     .bind(p.owner_id, `Your project "${p.name}" was ${status}. ${str(b?.reason, 300) ?? ""}`.trim()).run();
   return c.json({ ok: true });
 });
@@ -755,7 +762,7 @@ app.post("/api/admin/announce", async (c) => {
   const b = await c.req.json().catch(() => null);
   const text = str(b?.text, 500);
   if (!text) return err(c, 400, "text required");
-  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) SELECT id, ? FROM members WHERE status = 'active'`).bind(text).run();
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) SELECT id, ?, 'announce' FROM members WHERE status = 'active'`).bind(text).run();
   return c.json({ ok: true }, 201);
 });
 
@@ -778,7 +785,7 @@ app.post("/api/admin/mentor-requests/:id", async (c) => {
   const r = await c.env.DB.prepare(`SELECT * FROM mentor_requests WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
   if (!r) return err(c, 404, "not found");
   await c.env.DB.prepare(`UPDATE mentor_requests SET status = ? WHERE id = ?`).bind(action, r.id).run();
-  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text) VALUES (?, ?)`)
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
     .bind(r.member_id, `Your mentoring request was marked "${action}".`).run();
   return c.json({ ok: true });
 });

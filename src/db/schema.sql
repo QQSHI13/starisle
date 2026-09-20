@@ -170,9 +170,12 @@ CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_id INTEGER NOT NULL REFERENCES members(id),
   text TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'general',
   read INTEGER NOT NULL DEFAULT 0,
+  saved INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_notif_member_read ON notifications(member_id, read);
 
 CREATE TABLE IF NOT EXISTS project_stacks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
