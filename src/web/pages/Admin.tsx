@@ -55,7 +55,10 @@ export default function Admin() {
         {projs && projs.length === 0 && <p className="dim">{t.no_items}</p>}
       </section>
 
+      <UpdatesQueue />
+      <ReportsQueue />
       <MentorQueue />
+      <AuditLog />
       <AdminTools />
       <section style={{ padding: "0 0 28px" }}>
         <h3>{t.admin_enroll}</h3>
@@ -78,6 +81,64 @@ function useFetchData<T>(path: string | null, enabled: boolean) {
   const res = useFetch<{ [k: string]: T }>(enabled && path ? path : null, [tick, enabled]);
   const key = path?.split("/").pop() ?? "";
   return { data: res.data ? (res.data as any)[key === "applications" ? "applications" : key === "projects" ? "projects" : "enrollments"] : null, refresh: () => setTick(tick + 1) };
+}
+
+function UpdatesQueue() {
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ updates: any[] }>("/admin/updates", [tick]);
+  const items = data?.updates ?? [];
+  const decide = async (id: number, action: string) => { await api(`/admin/updates/${id}`, { method: "POST", body: JSON.stringify({ action }) }); setTick((x) => x + 1); };
+  if (items.length === 0) return null;
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>动态审核 · Update review</h3>
+      {items.map((u: any) => (
+        <div className="member-row" key={u.id}>
+          <span className="bio" style={{ flex: 1 }}><b>{u.author}</b> @ {u.project_name}:{u.text}</span>
+          <button className="btn small primary" onClick={() => decide(u.id, "approve")}>通过</button>{" "}
+          <button className="btn small danger" onClick={() => decide(u.id, "reject")}>拒绝</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ReportsQueue() {
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ reports: any[] }>("/admin/reports", [tick]);
+  const items = (data?.reports ?? []).filter((r: any) => r.status === "pending");
+  const decide = async (id: number, action: string) => { await api(`/admin/reports/${id}`, { method: "POST", body: JSON.stringify({ action }) }); setTick((x) => x + 1); };
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>举报队列 · Reports</h3>
+      {items.length === 0 && <p className="dim">没有待处理的举报。</p>}
+      {items.map((r: any) => (
+        <div className="member-row" key={r.id}>
+          <span className="bio" style={{ flex: 1 }}>{r.reporter} 举报了 {r.target_type} #{r.target_id}{r.reason ? ` — ${r.reason}` : ""}</span>
+          <button className="btn small danger" onClick={() => decide(r.id, "uphold")}>属实并下架</button>{" "}
+          <button className="btn small" onClick={() => decide(r.id, "dismiss")}>驳回</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function AuditLog() {
+  const { data } = useFetch<{ entries: any[] }>("/admin/audit", []);
+  const items = data?.entries ?? [];
+  if (items.length === 0) return null;
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>审计日志 · Audit log</h3>
+      {items.slice(0, 20).map((a: any) => (
+        <div className="member-row" key={a.id}>
+          <span className="pill">{a.action}</span>
+          <span className="bio" style={{ flex: 1 }}>{a.actor ?? "system"} — {a.detail}</span>
+          <span className="bio">{a.created_at.slice(0, 16)}</span>
+        </div>
+      ))}
+    </section>
+  );
 }
 
 function MentorQueue() {

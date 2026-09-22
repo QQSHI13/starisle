@@ -21,9 +21,9 @@ export function Students() {
           <div className="member-row" key={m.username}>
             <Avatar name={m.display_name || m.username} src={m.avatar} />
             <span className="dname">{m.display_name}</span>
-            <span className="uname">@{m.username}</span>
+            {m.username && <span className="uname">@{m.username}</span>}{!!m.verified && <span className="pill gold" style={{ marginLeft: 4 }}>已认证</span>}
             <span className="bio">{m.bio ?? t.no_bio}</span>
-            <Link className="go" to={`/u/${encodeURIComponent(m.username)}`}>{t.view_profile} →</Link>
+            <Link className="go" to={`/u/${m.id}`}>{t.view_profile} →</Link>
           </div>
         ))}
       </div></section>

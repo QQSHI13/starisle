@@ -69,6 +69,7 @@ export default function Me() {
 
       <JoinInbox />
       <ProfileForm me={me} onSaved={refresh} />
+      <Deactivate />
     </div>
   );
 }
@@ -167,6 +168,28 @@ function useJ() {
   return { data: res.data, refresh: () => setTick((x) => x + 1) };
 }
 
+function Deactivate() {
+  const [pw, setPw] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [show, setShow] = useState(false);
+  return (
+    <section style={{ padding: "0 0 36px", maxWidth: 480 }}>
+      <button className="btn small danger" onClick={() => setShow(!show)}>注销账号 · Deactivate account</button>
+      {show && (
+        <form onSubmit={async (e) => { e.preventDefault(); setMsg(null);
+          try { await api("/me/deactivate", { method: "POST", body: JSON.stringify({ password: pw }) }); location.href = "/"; }
+          catch (e2: any) { setMsg(String(e2.message)); } }}>
+          {msg && <div className="error-box" role="alert">{msg}</div>}
+          <p className="dim" style={{ fontSize: 13 }}>验证密码后账号将停用，个人资料会被清除。项目和历史记录按隐私政策保留。</p>
+          <label className="field"><span>密码 · Password</span>
+            <input type="password" required value={pw} onChange={(e: any) => setPw(e.target.value)} /></label>
+          <button className="btn small danger" type="submit">确认注销</button>
+        </form>
+      )}
+    </section>
+  );
+}
+
 function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
   const { t } = useLang();
   const [f, setF] = useState({ display_name: me.display_name, bio: me.bio ?? "", website_url: (me as any).website_url ?? "" });
@@ -186,6 +209,11 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
         <textarea rows={3} value={f.bio} onChange={(e: any) => setF({ ...f, bio: e.target.value })} /></label>
       <label className="field"><span>个人网站 · Personal website</span>
         <input type="text" value={f.website_url} onChange={(e: any) => setF({ ...f, website_url: e.target.value })} /></label>
+      <label className="check">
+        <input type="checkbox" checked={!!(me as any).real_name_public} disabled={!!(me as any).is_minor}
+          onChange={async (e: any) => { await api("/me", { method: "PUT", body: JSON.stringify({ real_name_public: e.target.checked }) }); onSaved(); }} />
+        <span>公开我的真实姓名（{(me as any).is_minor ? "未成年人不可公开" : "默认不公开"}）· Make my real name public</span>
+      </label>
       <button className="btn" type="submit">{t.save}</button>
     </form>
   );

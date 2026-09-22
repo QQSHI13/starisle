@@ -160,6 +160,14 @@ export function ProjectDetail() {
             )}
           </div>
         )}
+        <p style={{ marginTop: 20 }}>
+          <button className="btn small danger" onClick={async () => {
+            if (!me) { location.href = "/login"; return; }
+            const reason = prompt(lang === "zh" ? "举报原因（选填）" : "Reason (optional)") ?? "";
+            await api("/reports", { method: "POST", body: JSON.stringify({ target_type: "project", target_id: data.project.id, reason }) });
+            alert(lang === "zh" ? "已提交举报，管理员会尽快处理。" : "Report submitted.");
+          }}>{lang === "zh" ? "举报此项目" : "Report"}</button>
+        </p>
         {data.updates.length > 0 && (
           <>
             <h3>{lang === "zh" ? "项目动态" : "Updates"}</h3>

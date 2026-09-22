@@ -26,7 +26,7 @@ function Field({ label, hint, ...props }: any) {
 
 export function Apply() {
   const { t } = useLang();
-  const [f, setF] = useState({ username: "", password: "", display_name: "", email: "", repo_url: "", statement: "" });
+  const [f, setF] = useState({ username: "", password: "", display_name: "", email: "", repo_url: "", statement: "", age: "", guardian_name: "", guardian_contact: "" });
   const [c1, setC1] = useState(false);
   const [c2, setC2] = useState(false);
   const [token, setToken] = useState<string | null>(null);

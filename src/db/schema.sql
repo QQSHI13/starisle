@@ -11,6 +11,11 @@ CREATE TABLE IF NOT EXISTS members (
   salt TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'member',
   status TEXT NOT NULL DEFAULT 'active',
+  is_minor INTEGER NOT NULL DEFAULT 0,
+  guardian_name TEXT,
+  guardian_contact TEXT,
+  real_name_public INTEGER NOT NULL DEFAULT 0,
+  verified INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -30,6 +35,9 @@ CREATE TABLE IF NOT EXISTS applications (
   password_hash TEXT NOT NULL,
   salt TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,
+  is_minor INTEGER NOT NULL DEFAULT 0,
+  guardian_name TEXT,
+  guardian_contact TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   reason TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -203,6 +211,7 @@ CREATE TABLE IF NOT EXISTS project_updates (
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   author_id INTEGER NOT NULL REFERENCES members(id),
   text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -240,3 +249,21 @@ CREATE TABLE IF NOT EXISTS member_follows (
   UNIQUE (followee_id, follower_id)
 );
 CREATE INDEX IF NOT EXISTS idx_mfollows_follower ON member_follows(follower_id);
+
+CREATE TABLE IF NOT EXISTS reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reporter_id INTEGER NOT NULL REFERENCES members(id),
+  target_type TEXT NOT NULL,
+  target_id INTEGER NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_id INTEGER,
+  action TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

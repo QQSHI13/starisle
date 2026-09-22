@@ -1,47 +1,38 @@
-// Plain-Node server for Aliyun / any VPS: no Cloudflare anywhere.
-// - SQLite via node:sqlite (same SQL as D1)
-// - Hono app reused unchanged (env.DB shimmed)
-// - Serves dist/ statically + SPA fallback + /api
-// Usage: npm ci && npm run build && node src/server/node.ts   (Node >= 22.13)
-import { createServer } from "node:http";
-import { gzipSync, constants as z } from "node:zlib";
+// Self-contained server: Bun (fast path) or Node >= 22.13. No Docker, no Cloudflare.
+// Serves dist/ statically + /api (Hono app) + SPA fallback, with short-TTL API cache.
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
-// SQLite: prefers node:sqlite (Node >= 22.13), falls back to bun:sqlite (Bun)
-type DBClass = new (path: string) => any;
-let DatabaseSync: DBClass;
-{
-  const ns: any = await import("node:sqlite").catch(() => null as any);
-  if (ns?.DatabaseSync) {
-    DatabaseSync = ns.DatabaseSync;
-  } else {
-    const bun: any = await import("bun:sqlite" as any).catch(() => null as any);
-    if (!bun?.Database) throw new Error("need Node >= 22.13 or Bun");
-    DatabaseSync = bun.Database;
-  }
-}
-import app from "../worker/index.ts";
+import { gzipSync, constants as z } from "node:zlib";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 const DB_PATH = process.env.STARISLE_DB || join(ROOT, "data", "starisle.db");
 const DIST = join(ROOT, "dist");
 const PORT = Number(process.env.PORT || 3000);
+const SECURE = process.env.COOKIE_SECURE !== "0";
 
-mkdirSync(join(ROOT, "data"), { recursive: true });
+type DBClass = new (path: string) => any;
+let DatabaseSync: DBClass;
+{
+  const ns: any = await import("node:sqlite").catch(() => null as any);
+  if (ns?.DatabaseSync) DatabaseSync = ns.DatabaseSync;
+  else {
+    const bun: any = await import("bun:sqlite" as any).catch(() => null as any);
+    if (!bun?.Database) throw new Error("need Node >= 22.13 or Bun");
+    DatabaseSync = bun.Database;
+  }
+}
 const sqlite = new DatabaseSync(DB_PATH);
 sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
 
-// one-time schema + seed if empty
 const { n } = sqlite.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='members'").get() as any;
 if (!n) {
   console.log("empty database, applying schema + seed…");
-  for (const f of ["src/db/schema.sql", "src/db/seed.sql"]) {
-    sqlite.exec(readFileSync(join(ROOT, f), "utf8"));
-  }
+  sqlite.exec(readFileSync(join(ROOT, "src/db/schema.sql"), "utf8"));
+  sqlite.exec(readFileSync(join(ROOT, "src/db/seed.sql"), "utf8"));
   console.log("seeded.");
 }
 
-// D1-compatible shim over node:sqlite
+// D1-compatible shim over node:sqlite / bun:sqlite
 const DB = {
   prepare(sql: string) {
     const stmt = sqlite.prepare(sql);
@@ -61,10 +52,7 @@ const DB = {
         const r = stmt.run();
         return { meta: { last_row_id: Number(r.lastInsertRowid ?? 0), changes: Number(r.changes ?? 0) } };
       },
-      bind: (...params: any[]) => {
-        const args = params.map((p) => (p === undefined ? null : p));
-        return mk(args);
-      },
+      bind: (...params: any[]) => mk(params.map((p) => (p === undefined ? null : p))),
     };
   },
   batch: async (stmts: any[]) => {
@@ -73,46 +61,39 @@ const DB = {
   },
 };
 
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
-  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp",
-  ".woff2": "font/woff2", ".json": "application/json", ".ico": "image/x-icon",
+const { default: app } = await import("../worker/index.ts");
+
+// --- short-TTL cache for hot public GET endpoints ---
+const CACHEABLE = ["/api/stats", "/api/projects", "/api/courses", "/api/members", "/api/mentors", "/api/columns", "/api/partners", "/api/domains", "/api/activities", "/api/resources"];
+const cache = new Map<string, { exp: number; body: string; headers: Record<string, string> }>();
+const CACHE_TTL = 10_000;
+const cacheKey = (method: string, url: URL) => (method === "GET" && (CACHEABLE.includes(url.pathname) || url.pathname.startsWith("/api/projects?")) ? url.pathname + url.search : null);
+
+const SEC_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation()",
+  "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'",
 };
 
-const SECURE = process.env.COOKIE_SECURE !== "0"; // default: Secure cookies (serve behind HTTPS/nginx)
-
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+async function handle(request: Request): Promise<Response> {
+  const url = new URL(request.url);
   try {
     if (url.pathname.startsWith("/api/")) {
-      const body = req.method === "GET" || req.method === "HEAD" ? undefined : await new Promise<Buffer>((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        let size = 0;
-        req.on("data", (c) => { size += c.length; if (size > 1_048_576) { reject(new Error("payload too large")); req.destroy(); } else chunks.push(c); });
-        req.on("end", () => resolve(Buffer.concat(chunks)));
-      });
-      const request = new Request(`http://local${url.pathname}${url.search}`, {
-        method: req.method, headers: req.headers as any,
-        body: body ? new Uint8Array(body) : undefined,
-      });
+      const key = cacheKey(request.method, url);
+      if (request.method !== "GET" && request.method !== "HEAD") cache.clear();
+      const hit = key ? cache.get(key) : null;
+      if (hit && hit.exp > Date.now()) return new Response(hit.body, { status: 200, headers: hit.headers });
       const resp = await app.fetch(request, { DB, COOKIE_SECURE: SECURE } as any, {} as any);
-      const headers: Record<string, string> = {
-        "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY",
-        "Referrer-Policy": "strict-origin-when-cross-origin",
-        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-        "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'",
-        ...Object.fromEntries(resp.headers.entries()),
-      };
-      const payload = Buffer.from(await resp.arrayBuffer());
-      const gz = (req.headers["accept-encoding"] ?? "").includes("gzip") && payload.length > 1024 && (headers["Content-Type"] ?? "").includes("json");
-      if (gz) headers["Content-Encoding"] = "gzip";
-      headers["Vary"] = "Accept-Encoding";
-      res.writeHead(resp.status, headers);
-      res.end(gz ? gzipSync(payload, { level: z.Z_BEST_SPEED }) : payload);
-      return;
+      if (key && resp.status === 200) {
+        const body = await resp.text();
+        const headers = { "Content-Type": "application/json; charset=utf-8" };
+        cache.set(key, { exp: Date.now() + CACHE_TTL, body, headers });
+        return new Response(body, { status: 200, headers: { ...headers, ...SEC_HEADERS } });
+      }
+      return resp;
     }
-    // static + SPA fallback
     const safe = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
     let file = join(DIST, safe === "/" ? "index.html" : safe);
     if (!existsSync(file) || existsSync(join(file, "index.html"))) {
@@ -121,25 +102,51 @@ const server = createServer(async (req, res) => {
     }
     const data = readFileSync(file);
     const type = MIME[extname(file)] ?? "application/octet-stream";
-    const cache = extname(file) === ".html"
-      ? "no-cache"
-      : file.includes(`${DIST}/assets/`) || /\.(jpg|png|webp|woff2)$/.test(file)
-        ? "public, max-age=31536000, immutable"
-        : "public, max-age=86400";
-    const gz = /text|javascript|css|json|svg/.test(type) && (req.headers["accept-encoding"] ?? "").includes("gzip") && data.length > 1024;
-    res.writeHead(200, {
-      "Content-Type": type, "Content-Encoding": gz ? "gzip" : "identity",
-      "Cache-Control": cache, Vary: "Accept-Encoding",
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "DENY",
-      "Referrer-Policy": "strict-origin-when-cross-origin",
-      "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'",
-    });
-    res.end(gz ? gzipSync(data, { level: z.Z_BEST_SPEED }) : data);
+    const cacheHdr = extname(file) === ".html" ? "no-cache"
+      : file.includes(`${DIST}/assets/`) || /\.(jpg|png|webp|woff2)$/.test(file) ? "public, max-age=31536000, immutable"
+      : "public, max-age=86400";
+    const gz = /text|javascript|css|json|svg/.test(type) && (request.headers.get("accept-encoding") ?? "").includes("gzip") && data.length > 1024;
+    const headers: Record<string, string> = { "Content-Type": type, "Cache-Control": cacheHdr, Vary: "Accept-Encoding", ...SEC_HEADERS };
+    if (gz) headers["Content-Encoding"] = "gzip";
+    return new Response(gz ? gzipSync(data, { level: z.Z_BEST_SPEED }) : data, { status: 200, headers });
   } catch (e) {
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: String(e) }));
+    return Response.json({ error: String(e) }, { status: 500, headers: SEC_HEADERS });
   }
-});
+}
 
-server.listen(PORT, () => console.log(`starisle (aliyun mode) on http://localhost:${PORT}`));
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
+  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp",
+  ".woff2": "font/woff2", ".json": "application/json", ".ico": "image/x-icon",
+};
+
+const isBun = typeof (globalThis as any).Bun !== "undefined";
+if (isBun) {
+  (globalThis as any).Bun.serve({ port: PORT, fetch: handle });
+  console.log(`starisle (bun, fast path) on http://localhost:${PORT}`);
+} else {
+  const { createServer } = await import("node:http");
+  createServer(async (req, res) => {
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    const body = req.method === "GET" || req.method === "HEAD" ? undefined
+      : await new Promise<Buffer>((resolve, reject) => {
+          const chunks: Buffer[] = [];
+          let size = 0;
+          req.on("data", (c) => { size += c.length; if (size > 1_048_576) { reject(new Error("payload too large")); req.destroy(); } else chunks.push(c); });
+          req.on("end", () => resolve(Buffer.concat(chunks)));
+        });
+    const request = new Request(`http://local${url.pathname}${url.search}`, { method: req.method, headers: req.headers as any, body: body ? new Uint8Array(body) : undefined });
+    try {
+      const resp = await handle(request);
+      const payload = Buffer.from(await resp.arrayBuffer());
+      const headers = Object.fromEntries(resp.headers.entries());
+      const gz = !headers["Content-Encoding"] && (req.headers["accept-encoding"] ?? "").includes("gzip") && payload.length > 1024 && (headers["Content-Type"] ?? "").includes("text");
+      if (gz) headers["Content-Encoding"] = "gzip";
+      res.writeHead(resp.status, headers);
+      res.end(gz ? gzipSync(payload, { level: z.Z_BEST_SPEED }) : payload);
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e) }));
+    }
+  }).listen(PORT, () => console.log(`starisle (node) on http://localhost:${PORT}`));
+}

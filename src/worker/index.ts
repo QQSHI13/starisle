@@ -9,6 +9,7 @@ type Member = {
   bio: string | null; repo_url: string | null; avatar: string | null;
   role: string; status: string; created_at: string;
   password_hash: string; salt: string;
+  is_minor?: number; real_name_public?: number; verified?: number;
 };
 
 const app = new Hono<{ Bindings: Bindings & { COOKIE_SECURE?: string } }>();
@@ -121,10 +122,15 @@ app.get("/api/projects/:slug", async (c) => {
     `SELECT text, done FROM project_milestones WHERE project_id = ? ORDER BY sort, id`).bind(p.id).all();
   const followerCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM project_follows WHERE project_id = ?`).bind(p.id).first<any>();
   const me = await currentUser(c);
+  const me2 = me;
   const following = me ? await c.env.DB.prepare(`SELECT 1 x FROM project_follows WHERE project_id = ? AND member_id = ?`).bind(p.id, me.id).first() : null;
+  const viewer = me2;
+  const isMember = viewer && await c.env.DB.prepare(`SELECT 1 x FROM project_members WHERE project_id = ? AND member_id = ?`).bind(p.id, viewer.id).first();
+  const isAdmin2 = viewer && viewer.role === "admin";
   const updates = await c.env.DB.prepare(
-    `SELECT u.text, u.created_at, m.display_name AS author FROM project_updates u
-     JOIN members m ON m.id = u.author_id WHERE u.project_id = ? ORDER BY u.created_at DESC LIMIT 20`).bind(p.id).all();
+    `SELECT u.id, u.text, u.status, u.created_at, m.display_name AS author, m.id AS author_id FROM project_updates u
+     JOIN members m ON m.id = u.author_id WHERE u.project_id = ? ${isMember || isAdmin2 ? "" : "AND u.status = 'approved' "}
+     ORDER BY u.created_at DESC LIMIT 20`).bind(p.id).all();
   const repo_stats = await repoStatsFor(c as any, p);
   return c.json({
     project: p, members: members.results,
@@ -186,20 +192,41 @@ app.post("/api/projects/:slug/updates", async (c) => {
   const b = await c.req.json().catch(() => null);
   const text = str(b?.text, 1000);
   if (!text) return err(c, 400, "update text required");
-  await c.env.DB.prepare(`INSERT INTO project_updates (project_id, author_id, text) VALUES (?,?,?)`).bind(p.id, m.id, text).run();
-  await c.env.DB.prepare(
-    `INSERT INTO notifications (member_id, text, type)
-     SELECT DISTINCT f.member_id, ? || m.display_name || ? || p.name || ? || ?
-     FROM project_follows f JOIN projects p ON p.id = f.project_id JOIN members m ON m.id = ?
-     , 'update' WHERE f.project_id = ? AND f.member_id != ?
-     UNION
-     SELECT DISTINCT mf.follower_id, ? || m2.display_name || ? || p2.name || ? || ?
-     FROM member_follows mf JOIN members m2 ON m2.id = mf.followee_id
-       JOIN projects p2 ON p2.id = ? JOIN members au ON au.id = m2.id
-     , 'update' WHERE mf.followee_id = ? AND mf.follower_id != ?`)
-    .bind(``, ` posted an update on "`, `": `, text, m.id, p.id, m.id,
-          ``, ` posted an update on "`, `": `, text, p.id, m.id, m.id).run();
-  return c.json({ ok: true }, 201);
+  await c.env.DB.prepare(`INSERT INTO project_updates (project_id, author_id, text, status) VALUES (?,?,?, 'pending')`).bind(p.id, m.id, text).run();
+  return c.json({ ok: true, status: "pending" }, 201);
+});
+
+app.get("/api/admin/updates", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id, u.text, u.status, u.created_at, p.name AS project_name, p.slug AS project_slug, mem.display_name AS author
+     FROM project_updates u JOIN projects p ON p.id = u.project_id JOIN members mem ON mem.id = u.author_id
+     WHERE u.status = 'pending' ORDER BY u.created_at`).all();
+  return c.json({ updates: results });
+});
+
+app.post("/api/admin/updates/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const u = await c.env.DB.prepare(`SELECT * FROM project_updates WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!u) return err(c, 404, "not found");
+  const action = b?.action === "approve" ? "approved" : "rejected";
+  await c.env.DB.prepare(`UPDATE project_updates SET status = ? WHERE id = ?`).bind(action, u.id).run();
+  await c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, ?, ?)`)
+    .bind(m.id, `update:${action}`, `update ${u.id} on project ${u.project_id}`).run();
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'update')`)
+    .bind(u.author_id, `Your project update was ${action}.`).run();
+  if (action === "approved") {
+    const p2 = await c.env.DB.prepare(`SELECT name FROM projects WHERE id = ?`).bind(u.project_id).first<any>();
+    const author = await c.env.DB.prepare(`SELECT display_name FROM members WHERE id = ?`).bind(u.author_id).first<any>();
+    await c.env.DB.prepare(
+      `INSERT INTO notifications (member_id, text, type)
+       SELECT DISTINCT f.member_id, ?, 'update' FROM project_follows f WHERE f.project_id = ? AND f.member_id != ?`)
+      .bind(`${author?.display_name} posted an update on "${p2?.name}": ${u.text}`, u.project_id, u.author_id).run();
+  }
+  return c.json({ ok: true });
 });
 
 app.post("/api/projects/:slug/join", async (c) => {
@@ -272,18 +299,26 @@ app.get("/api/columns/:slug", async (c) => {
   return c.json({ column });
 });
 
-app.get("/api/members", async (c) =>
-  c.json({ members: (await c.env.DB.prepare(
-    `SELECT m.username, m.display_name, m.bio, m.repo_url, m.website_url, m.avatar, m.created_at,
+app.get("/api/members", async (c) => {
+  const viewer = await currentUser(c);
+  const showName = !!viewer && viewer.role === "admin";
+  const { results } = await c.env.DB.prepare(
+    `SELECT m.id, m.username, m.display_name, m.bio, m.website_url, m.avatar, m.verified, m.real_name_public, m.created_at,
        (SELECT COUNT(*) FROM project_members pm JOIN projects p ON p.id = pm.project_id
          WHERE pm.member_id = m.id AND p.status='approved') AS project_count
-     FROM members m WHERE m.status = 'active' ORDER BY m.created_at DESC`).all()).results }));
+     FROM members m WHERE m.status = 'active' ORDER BY m.created_at DESC`).all();
+  return c.json({ members: (results as any[]).map((m) => ({ ...m, username: m.real_name_public || showName ? m.username : null })) });
+});
 
 app.get("/api/members/:username", async (c) => {
-  const m = await c.env.DB.prepare(
-    `SELECT username, display_name, bio, repo_url, website_url, avatar, created_at FROM members
-     WHERE username = ? AND status = 'active'`).bind(c.req.param("username")).first();
+  const key = c.req.param("username");
+  const viewer = await currentUser(c);
+  const isAdmin = !!viewer && viewer.role === "admin";
+  const m: any = await c.env.DB.prepare(
+    `SELECT id, username, display_name, bio, website_url, avatar, verified, real_name_public, created_at FROM members
+     WHERE (username = ? OR id = ?) AND status = 'active'`).bind(key, /^(\d+)$/.test(key) ? Number(key) : -1).first();
   if (!m) return err(c, 404, "member not found");
+  if (!m.real_name_public && !isAdmin && (!viewer || viewer.username !== m.username)) m.username = null;
   const projects = await c.env.DB.prepare(
     `SELECT p.slug, p.name, p.tagline, pm.role FROM project_members pm
      JOIN projects p ON p.id = pm.project_id
@@ -327,6 +362,14 @@ app.post("/api/auth/register", async (c) => {
   if (statement.length < 10) return err(c, 400, "statement must be at least 10 characters");
   if (password.length < 8 || password.length > 72) return err(c, 400, "password must be 8–72 characters");
   if (!b.consent_privacy || !b.consent_public) return err(c, 400, "both consent checkboxes are required");
+  const age = Number(b.age);
+  if (!Number.isInteger(age) || age < 8 || age > 100) return err(c, 400, "please provide a valid age");
+  const isMinor = age < 18 ? 1 : 0;
+  const under14 = age < 14;
+  const guardianName = str(b.guardian_name, 60);
+  const guardianContact = str(b.guardian_contact, 120);
+  if (under14 && (!guardianName || !guardianContact))
+    return err(c, 400, "under 14 requires guardian name and contact for verification");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err(c, 400, "invalid email");
   const taken = await c.env.DB.prepare(`SELECT 1 x FROM members WHERE username = ? UNION SELECT 1 FROM applications WHERE username = ?`)
     .bind(username, username).first();
@@ -335,9 +378,9 @@ app.post("/api/auth/register", async (c) => {
   const hash = await hashPassword(password, salt);
   const token = newToken();
   await c.env.DB.prepare(
-    `INSERT INTO applications (username, display_name, email, repo_url, statement, password_hash, salt, token)
-     VALUES (?,?,?,?,?,?,?,?)`)
-    .bind(username, display, email, repo, statement, hash, salt, token).run();
+    `INSERT INTO applications (username, display_name, email, repo_url, statement, password_hash, salt, token, is_minor, guardian_name, guardian_contact)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(username, display, email, repo, statement, hash, salt, token, isMinor, guardianName, guardianContact).run();
   return c.json({ token, status: "pending" }, 201);
 });
 
@@ -387,6 +430,23 @@ app.get("/api/auth/me", async (c) => {
   if (!m) return c.json({ member: null });
   const { password_hash, salt, ...safe } = m;
   return c.json({ member: safe });
+});
+
+app.post("/api/me/deactivate", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const b = await c.req.json().catch(() => null);
+  if ((await hashPassword(String(b?.password ?? ""), m.salt)) !== m.password_hash)
+    return err(c, 403, "password required to deactivate");
+  const owned = await c.env.DB.prepare(
+    `SELECT COUNT(*) n FROM projects p JOIN project_members pm ON pm.project_id = p.id
+     WHERE p.owner_id = ? AND pm.member_id != ?`).bind(m.id, m.id).first<any>();
+  if ((owned?.n ?? 0) > 0) return err(c, 409, "withdraw other members from your projects first");
+  await c.env.DB.batch([
+    c.env.DB.prepare(`DELETE FROM sessions WHERE member_id = ?`).bind(m.id),
+    c.env.DB.prepare(`UPDATE members SET status = 'deactivated', bio = NULL, website_url = NULL, avatar = NULL WHERE id = ?`).bind(m.id),
+  ]);
+  return c.json({ ok: true });
 });
 
 app.post("/api/auth/recovery-code", async (c) => {
@@ -629,6 +689,10 @@ app.put("/api/me", async (c) => {
     const taken = await c.env.DB.prepare(`SELECT 1 x FROM members WHERE username = ?`).bind(str(b.username, 40)).first();
     if (taken) return err(c, 409, "username already taken");
   }
+  if (b?.real_name_public !== undefined && typeof b.real_name_public === "boolean") {
+    if (m.is_minor && b.real_name_public) return err(c, 403, "minors cannot make their real name public");
+    await c.env.DB.prepare(`UPDATE members SET real_name_public = ? WHERE id = ?`).bind(b.real_name_public ? 1 : 0, m.id).run();
+  }
   await c.env.DB.prepare(
     `UPDATE members SET display_name = ?, bio = ?, repo_url = ?, website_url = ?,
        username = COALESCE(?, username) WHERE id = ?`)
@@ -642,7 +706,7 @@ app.get("/api/admin/applications", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
   const { results } = await c.env.DB.prepare(
-    `SELECT id, username, display_name, email, repo_url, statement, status, reason, created_at
+    `SELECT id, username, display_name, email, repo_url, statement, status, reason, is_minor, guardian_name, guardian_contact, created_at
      FROM applications ORDER BY created_at DESC`).all();
   return c.json({ applications: results });
 });
@@ -661,6 +725,8 @@ app.post("/api/admin/applications/:id", async (c) => {
       `INSERT INTO members (username, display_name, email, repo_url, bio, password_hash, salt)
        VALUES (?,?,?,?,?,?,?)`)
       .bind(a.username, a.display_name, a.email, a.repo_url, null, a.password_hash, a.salt).run();
+    await c.env.DB.prepare(`UPDATE members SET is_minor = ?, guardian_name = ?, guardian_contact = ? WHERE username = ?`)
+      .bind(a.is_minor, a.guardian_name, a.guardian_contact, a.username).run();
     await c.env.DB.prepare(
       `INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
       .bind(r.meta.last_row_id, "Your application has been approved. Welcome to Starisle.", "application").run();
@@ -695,6 +761,68 @@ app.post("/api/admin/projects/:id", async (c) => {
   await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
     .bind(p.owner_id, `Your project "${p.name}" was ${status}. ${str(b?.reason, 300) ?? ""}`.trim()).run();
   return c.json({ ok: true });
+});
+
+app.post("/api/reports", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const b = await c.req.json().catch(() => null);
+  const type = str(b?.target_type, 20);
+  const id = Number(b?.target_id);
+  if (!type || !id) return err(c, 400, "target required");
+  await c.env.DB.prepare(`INSERT INTO reports (reporter_id, target_type, target_id, reason) VALUES (?,?,?,?)`)
+    .bind(m.id, type, id, str(b?.reason, 500) ?? "").run();
+  return c.json({ ok: true }, 201);
+});
+
+app.get("/api/admin/reports", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.*, mem.display_name AS reporter FROM reports r JOIN members mem ON mem.id = r.reporter_id
+     ORDER BY r.status = 'pending' DESC, r.created_at DESC`).all();
+  return c.json({ reports: results });
+});
+
+app.post("/api/admin/reports/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const action = b?.action === "uphold" ? "upheld" : "dismissed";
+  const r = await c.env.DB.prepare(`SELECT * FROM reports WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!r) return err(c, 404, "not found");
+  let detail = `report ${r.id} (${r.target_type} ${r.target_id}): ${action}`;
+  if (action === "upheld") {
+    if (r.target_type === "update") await c.env.DB.prepare(`DELETE FROM project_updates WHERE id = ?`).bind(r.target_id).run();
+    if (r.target_type === "project") await c.env.DB.prepare(`UPDATE projects SET status = 'rejected' WHERE id = ?`).bind(r.target_id).run();
+    if (r.target_type === "member") await c.env.DB.prepare(`UPDATE members SET bio = NULL, avatar = NULL WHERE id = ?`).bind(r.target_id).run();
+    detail += " — content removed";
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE reports SET status = ? WHERE id = ?`).bind(action, r.id),
+    c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'report', ?)`).bind(m.id, detail),
+  ]);
+  return c.json({ ok: true });
+});
+
+app.get("/api/admin/audit", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const { results } = await c.env.DB.prepare(
+    `SELECT a.*, mem.display_name AS actor FROM audit_log a LEFT JOIN members mem ON mem.id = a.actor_id
+     ORDER BY a.created_at DESC LIMIT 100`).all();
+  return c.json({ entries: results });
+});
+
+app.post("/api/admin/members/:id/verify", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const t = await c.env.DB.prepare(`SELECT verified FROM members WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!t) return err(c, 404, "not found");
+  await c.env.DB.prepare(`UPDATE members SET verified = ? WHERE id = ?`).bind(t.verified ? 0 : 1, Number(c.req.param("id"))).run();
+  await c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'verify', ?)`)
+    .bind(m.id, `member ${c.req.param("id")} verified=${t.verified ? 0 : 1}`).run();
+  return c.json({ verified: t.verified ? 0 : 1 });
 });
 
 app.post("/api/admin/activities", async (c) => {
