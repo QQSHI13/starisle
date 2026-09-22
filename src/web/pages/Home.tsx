@@ -44,24 +44,28 @@ export default function Home() {
       <section className="hero">
         <div className="wrap">
           <p className="kicker">{t.hero_kicker}</p>
-          <h1>{t.hero_title_a}<br /><em>{t.hero_title_b}</em></h1>
-          <p className="lede">{t.hero_body}</p>
-          <div className="cta">
-            <Link className="btn primary" to="/projects">{t.hero_cta_projects}</Link>
-            <Link className="btn" to="/apply">{t.hero_cta_apply}</Link>
-          </div>
-          <div className="trust">
-            <span><Star />{t.trust_repo}</span>
-            <span><Star />{t.trust_scope}</span>
-            <span><Star />{t.trust_review}</span>
-          </div>
-          {statItems.length > 0 && (
-            <div className="stats">
-              {statItems.map(([n, label]) => (
-                <div key={label}><b>{n}</b><span>{label}</span></div>
-              ))}
+          <div className="hero-grid">
+            <div>
+              <h1>{t.hero_title_a}<br /><em>{t.hero_title_b}</em></h1>
+              <p className="lede">{t.hero_body}</p>
+              <div className="cta">
+                <Link className="btn primary" to="/projects">{t.hero_cta_projects}</Link>
+                <Link className="btn" to="/apply">{t.hero_cta_apply}</Link>
+              </div>
+              <div className="trust">
+                <span><Star />{t.trust_repo}</span>
+                <span><Star />{t.trust_scope}</span>
+                <span><Star />{t.trust_review}</span>
+              </div>
             </div>
-          )}
+            {statItems.length > 0 && (
+              <div className="hero-stats">
+                {statItems.map(([n, label]) => (
+                  <div key={label}><b>{n}</b><span>{label}</span></div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 

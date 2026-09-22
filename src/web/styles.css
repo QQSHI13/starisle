@@ -113,6 +113,10 @@ nav.main a.active { color: var(--gold); font-weight: 600; }
 .trust span { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-2); }
 .trust svg { width: 13px; height: 13px; fill: var(--gold); flex: none; }
 
+.hero-grid { display: grid; grid-template-columns: 1fr auto; gap: 72px; align-items: center; }
+.hero-stats { display: flex; flex-direction: column; gap: 30px; border-left: 1px solid var(--line-strong); padding-left: 48px; }
+.hero-stats b { font-family: var(--serif); font-size: 52px; font-weight: 600; display: block; line-height: 1.05; }
+.hero-stats span { font-size: 13px; color: var(--ink-3); letter-spacing: 0.04em; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: 64px 0 0; border-top: 1px solid var(--line-strong); }
 .stats > div { padding: 24px 28px 4px 0; }
 .stats b { font-family: var(--serif); font-size: 44px; font-weight: 600; display: block; line-height: 1.1; }
@@ -205,6 +209,9 @@ footer.site .legal { margin-top: 52px; padding-top: 20px; border-top: 1px solid 
 
 @media (max-width: 720px) {
   .hero { padding: 72px 0 56px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+  .hero-stats { flex-direction: row; gap: 36px; border-left: 0; border-top: 1px solid var(--line-strong); padding: 24px 0 0; flex-wrap: wrap; }
+  .hero-stats b { font-size: 40px; }
   .stats > div { padding-right: 18px; }
   footer.site .cols { grid-template-columns: 1fr; }
   .toolbar input[type="text"] { width: 100%; }
