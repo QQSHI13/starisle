@@ -44,7 +44,7 @@ jobs:
         with:
           name: dist
           path: dist
-      - run: npm ci
+      - run: bun install --frozen-lockfile
       - name: Reset local D1 and apply seed
         run: |
           bunx wrangler d1 execute starisle --local --file=src/db/schema.sql
@@ -81,7 +81,7 @@ jobs:
         with:
           name: dist
           path: dist
-      - run: npm ci
+      - run: bun install --frozen-lockfile
       - name: Apply D1 schema (idempotent)
         run: bunx wrangler d1 execute starisle --remote --file=src/db/schema.sql
         env:
