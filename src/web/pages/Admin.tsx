@@ -57,6 +57,7 @@ export default function Admin() {
 
       <UpdatesQueue />
       <ReportsQueue />
+      <MembersAdmin />
       <MentorQueue />
       <AuditLog />
       <AdminTools />
@@ -141,6 +142,40 @@ function AuditLog() {
   );
 }
 
+function MembersAdmin() {
+  const [q, setQ] = useState("");
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ members: any[] }>("/admin/members", [tick]);
+  const members = (data?.members ?? []).filter((m: any) =>
+    !q.trim() || (m.username + m.display_name + (m.email ?? "")).toLowerCase().includes(q.trim().toLowerCase()));
+  const verify = async (id: number) => { await api(`/admin/members/${id}/verify`, { method: "POST", body: "{}" }); setTick((x) => x + 1); };
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>成员管理 · Members (admin view — real names visible)</h3>
+      <div className="toolbar"><input type="text" placeholder="搜索真实姓名 / 网名 / 邮箱…" value={q} onChange={(e: any) => setQ(e.target.value)} style={{ width: 280 }} /></div>
+      <table className="list">
+        <thead><tr><th>真实姓名</th><th>网名</th><th>邮箱</th><th>项目</th><th>标记</th><th></th></tr></thead>
+        <tbody>
+          {members.map((m: any) => (
+            <tr key={m.id}>
+              <td>{m.username}{m.status !== "active" && <span className="pill" style={{ marginLeft: 6 }}>{m.status}</span>}</td>
+              <td>{m.display_name}</td>
+              <td className="dim">{m.email}</td>
+              <td>{m.project_count}</td>
+              <td style={{ whiteSpace: "nowrap" }}>
+                {!!m.is_minor && <span className="pill gold">未成年</span>}{" "}
+                {!!m.is_minor && m.guardian_name && <span className="pill" title={m.guardian_contact}>{m.guardian_name}</span>}{" "}
+                {!!m.verified && <span className="pill gold">已认证</span>}
+              </td>
+              <td><button className="btn small" onClick={() => verify(m.id)}>{m.verified ? "取消认证" : "认证"}</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function MentorQueue() {
   const { t } = useLang();
   const [tick, setTick] = useState(0);
@@ -157,7 +192,7 @@ function MentorQueue() {
       {reqs.map((r: any) => (
         <div className="member-row" key={r.id}>
           <span className="dname" style={{ fontSize: 15 }}>{r.member_name}</span>
-          <span className="bio">想跟 {r.mentor_name} 做:{r.interest}{r.questions ? ` · 问:${r.questions}` : ""}</span>
+          <span className="bio">{r.member_username ? `(${r.member_username}) ` : ""}想跟 {r.mentor_name} 做:{r.interest}{r.questions ? ` · 问:${r.questions}` : ""}</span>
           <button className="btn small primary" onClick={() => decide(r.id, "approve")}>通过</button>{" "}
           <button className="btn small" onClick={() => decide(r.id, "contacted")}>已对接</button>{" "}
           <button className="btn small danger" onClick={() => decide(r.id, "reject")}>{t.reject}</button>

@@ -820,6 +820,17 @@ app.post("/api/admin/reports/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+app.get("/api/admin/members", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const { results } = await c.env.DB.prepare(
+    `SELECT mem.id, mem.username, mem.display_name, mem.email, mem.is_minor, mem.guardian_name,
+       mem.guardian_contact, mem.verified, mem.status, mem.created_at,
+       (SELECT COUNT(*) FROM project_members pm WHERE pm.member_id = mem.id) AS project_count
+     FROM members mem ORDER BY mem.created_at DESC`).all();
+  return c.json({ members: results });
+});
+
 app.get("/api/admin/audit", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
@@ -914,7 +925,7 @@ app.get("/api/admin/mentor-requests", async (c) => {
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
   const { results } = await c.env.DB.prepare(
     `SELECT r.id, r.interest, r.background, r.questions, r.status, r.created_at,
-       mem.display_name AS member_name, mt.name AS mentor_name
+       mem.display_name AS member_name, mem.username AS member_username, mt.name AS mentor_name
      FROM mentor_requests r JOIN members mem ON mem.id = r.member_id JOIN mentors mt ON mt.id = r.mentor_id
      ORDER BY r.created_at DESC`).all();
   return c.json({ requests: results });
