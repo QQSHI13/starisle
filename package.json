@@ -5,16 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "bunx vite",
+    "dev:api": "bunx wrangler dev --port 8790",
     "build": "bunx vite build",
-    "typecheck": "bunx tsc --noEmit",
+    "check": "bunx tsc --noEmit",
     "start": "bun src/server/node.ts",
-    "start:node": "node src/server/node.ts",
-    "seed": "bun scripts/fetch-seed.mjs && bun scripts/hash-passwords.mjs",
-    "db:reset": "wrangler d1 execute starisle --local --file=src/db/schema.sql && wrangler d1 execute starisle --local --file=src/db/seed.sql",
-    "db:reset:remote": "wrangler d1 execute starisle --remote --file=src/db/schema.sql && wrangler d1 execute starisle --remote --file=src/db/seed.sql",
     "demo": "rm -rf data dist && bun run seed && bun run build && bun src/server/node.ts",
-    "deploy": "wrangler deploy",
-    "worker:dev": "wrangler dev"
+    "seed": "bun scripts/fetch-seed.mjs && bun scripts/hash-passwords.mjs",
+    "deploy": "bunx wrangler deploy"
   },
   "dependencies": {
     "hono": "^4.13.8",

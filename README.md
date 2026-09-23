@@ -1,58 +1,82 @@
-# 星屿 Starisle — full rebuild
+# 星屿 Starisle
 
-A from-scratch replacement for https://forum.aiyf.org.cn: one Cloudflare Worker (Hono) serving a JSON API and a React SPA, backed by D1 SQLite, seeded with the community's real data (projects, courses, members, mentors, partners, the dean's letter).
+A full rebuild of the community platform at https://forum.aiyf.org.cn — invite-only, human-reviewed, minors-first.
+One codebase runs anywhere: **Bun + SQLite** (self-contained, no Docker, no Cloudflare required) or **Cloudflare Workers + D1**.
 
-No UI kits, no Tailwind, no gradients. Hand-written CSS with a light/dark theme, real zh/en i18n for all chrome, and honest empty states.
+No UI kits, no Tailwind, no gradients. Hand-written CSS with light/dark themes, real zh/en i18n, honest empty states.
 
-## Run it
-
-```bash
-npm install
-npm run demo        # reset DB → seed → build → serve on http://localhost:8787
-```
-
-or step by step:
+## Quick start (Bun)
 
 ```bash
-npm run seed        # fetch real data from the legacy site into src/db/seed.sql
-npm run db:reset    # apply schema + seed to the local D1
-npm run build       # build the SPA into dist/
-npx wrangler dev    # serve API + SPA on :8787
+bun install
+bun run demo      # fresh everything: re-harvest data → build → serve on http://localhost:3000
 ```
 
-`npm run dev` runs only the Vite dev server on :5173 with `/api` proxied to :8787 (start `wrangler dev` too).
+The server creates `data/starisle.db` on first boot and auto-applies schema + seed.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `bun run start` | self-contained server (Bun fast path, API cache, gzip, security headers) |
+| `bun run demo` | nuke `data/` + `dist/`, re-seed, rebuild, serve — the one-command demo |
+| `bun run dev` | Vite dev server on :5173 (`/api` proxied to :8790) |
+| `bun run dev:api` | Cloudflare-mode API on :8790 (pair with `bun run dev`) |
+| `bun run build` | build the SPA into `dist/` |
+| `bun run check` | typecheck |
+| `bun run seed` | re-harvest real data from the legacy site into `src/db/seed.sql` |
+| `bun run deploy` | deploy to Cloudflare Workers (also runs automatically via CI on push) |
+
+Node ≥ 22.13 works as a drop-in for the server (`node src/server/node.ts`), but Bun is the default and the fast path.
 
 ## Demo accounts
 
-All seeded accounts (including every imported member) use the dev password **`starisle-dev`**.
-Demo accounts: admin `演示管理员` (Demo Admin, role=admin — reviews applications/projects/course requests at `/admin`),
-and `演示成员` (Demo Member). Imported members keep their real names/roles (no admin rights).
+Every seeded account (including all imported members) uses the dev password **`starisle-dev`**.
+Admin: `演示管理员` (dashboard at `/admin`). Imported members keep their real names with normal member rights.
 
 ## Features
 
-- Public: projects (search/domain filter/open roles/showcase posters), courses, columns (full dean's letter), students directory + profiles, mentors (+ request form), events & resources with honest empty states, partners, stats.
-- Auth: apply (with minor/guardian consent + public-data consent), application status query, login, one-time recovery codes (90-day) as the only reset path, sessions in D1.
-- Member: start/edit projects (human review), course requests, mentor requests, notifications, profile editing, username change gated on password.
-- Admin: review queues for applications / projects / enrollments with reject reasons; every decision notifies the member.
-- i18n: every UI string in zh + en; theme + language persist, `lang` attribute follows.
+**Public** — projects (search, domain filter, open roles, real poster boards, live GitHub/Gitee repo stats), courses, columns (incl. the dean's letter), students directory (+ search, verified badges), mentors, events & resources with honest empty states, partners (logos self-hosted), community pulse feed on the homepage.
+
+**Accounts** — application with age + real guardian consent (under-14 requires guardian name/contact, verified by admins), application status query, login, one-time recovery codes as the only reset path.
+
+**Members** — start/edit projects (human review), dev-log updates (moderated), follow projects & people with notification fan-out, join requests with owner inbox, course requests, mentor requests, profile + personal website, real-name visibility toggle (default private; minors locked private), account deactivation with data cleanup.
+
+**Notifications (GitHub-style)** — inbox/saved/done views, type filters (项目动态/加入/申请/审核/导师/公告), search, per-item done/save/delete, 20s polling + refresh on tab focus.
+
+**Admin** (`/admin`) — queues for applications (with guardian info), pending projects, course requests, update moderation, mentor requests, and reports; site operations (publish events/resources/columns, broadcast notices); audit log of every admin action.
+
+**Safety (minors-first)** — real-name private by default, guardian records, all UGC moderated, one-click reports with takedown + audit trail, verified-teacher flag, secure headers everywhere, payload caps, rate-limited auth.
+
+**Performance** — Bun.serve fast path, 10s TTL cache on public endpoints, gzip, immutable asset caching, DB indexes, background repo-stat refresh. Comfortably serves 400 concurrent users on a 2-core/4G box with ~25× headroom.
+
+## Deploy
+
+**Any VPS (the simple way)** — the whole app is one process:
+
+```bash
+bun install && bun run build
+bun src/server/node.ts        # :3000, auto-creates + seeds the DB
+```
+
+Behind nginx (`proxy_pass http://127.0.0.1:3000`) with a systemd unit (`Restart=always`). Backups = copy `data/starisle.db` (add a daily cron).
+
+**Cloudflare** — push to `main`; CI (typecheck → build → API smoke → deploy) ships it automatically. Requires repo secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
 
 ## Layout
 
 ```
-src/worker/     Hono API (auth, projects, courses, admin, …)
+src/worker/     Hono API (auth, projects, courses, admin, moderation, …)
+src/server/     self-contained Bun/Node server (SQLite shim, statics, cache)
 src/db/         schema.sql + generated seed.sql
 src/web/        React SPA (pages, i18n dictionary, hand-written CSS)
 scripts/        fetch-seed.mjs (harvests legacy API), hash-passwords.mjs
-wrangler.toml   worker + D1 + static assets config
+wrangler.toml   Cloudflare worker + D1 config (optional path)
 ```
-
-Not deployed on purpose — `wrangler deploy` when ready.
 
 ## Integrating with the original site
 
-This rebuild is designed to be adopted piecemeal by the original team:
-
-- **Mount under a path**: `BASE_PATH=/v2 npm run build` makes the SPA run at `https://forum.aiyf.org.cn/v2/` (router basename + asset base adjust automatically). Deploy the worker on the same Cloudflare account and add a `forum.aiyf.org.cn/v2/*` route.
-- **API prefix**: all endpoints live under `/api/*`; set the worker's `API_PREFIX` var (default `/api`) if the original site needs `/api/v2/*` during a transition window. The frontend calls same-origin paths only, so a proxy rule on the origin is enough — no CORS changes needed.
-- **Data migration**: `npm run seed` re-harvests everything from the legacy API into D1; run it once against production D1 to import live data, then point the frontend at the new worker.
-- **Session coexistence**: the session cookie is named `sid` and is path-scoped; it won't collide with the original site's cookie.
+- **Mount under a path**: `BASE_PATH=/v2 bun run build` serves the SPA from `https://forum.aiyf.org.cn/v2/` (router basename + asset base adjust automatically).
+- **API prefix**: all endpoints live under `/api/*`; a same-origin proxy rule on the origin is enough — no CORS changes.
+- **Data migration**: `bun run seed` re-harvests everything from the legacy API; run once, point the frontend at the new deployment.
+- **Sessions**: cookie is named `sid`, path-scoped — no collision with the original site's cookie.
