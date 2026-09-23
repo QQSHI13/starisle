@@ -17,7 +17,7 @@
     "worker:dev": "wrangler dev"
   },
   "dependencies": {
-    "hono": "^4.6.0",
+    "hono": "^4.13.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.4"
