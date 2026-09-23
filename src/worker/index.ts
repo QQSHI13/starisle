@@ -281,10 +281,137 @@ app.get("/api/courses", async (c) =>
   c.json({ courses: (await c.env.DB.prepare(`SELECT * FROM courses WHERE status='published' ORDER BY featured DESC, title`).all()).results }));
 
 app.get("/api/courses/:slug", async (c) => {
-  const course = await c.env.DB.prepare(`SELECT * FROM courses WHERE slug = ? AND status='published'`)
+  const course: any = await c.env.DB.prepare(`SELECT * FROM courses WHERE slug = ? AND status='published'`)
     .bind(c.req.param("slug")).first();
   if (!course) return err(c, 404, "course not found");
-  return c.json({ course });
+  const me = await currentUser(c);
+  const enrolled = me ? await c.env.DB.prepare(`SELECT status FROM enrollments WHERE course_id = ? AND member_id = ?`).bind(course.id, me.id).first<any>() : null;
+  const canView = !!enrolled && enrolled.status === "approved";
+  const isAdmin = me?.role === "admin";
+  const lessons = await c.env.DB.prepare(
+    `SELECT l.id, l.title, l.summary, l.sort, l.content FROM course_lessons l WHERE l.course_id = ? ORDER BY l.sort, l.id`).bind(course.id).all();
+  const homework = await c.env.DB.prepare(
+    `SELECT h.id, h.title, h.instructions, h.due_at, l.title AS lesson_title FROM homework h
+     JOIN course_lessons l ON l.id = h.lesson_id WHERE l.course_id = ? ORDER BY h.due_at`).bind(course.id).all();
+  const submissions = me ? (await c.env.DB.prepare(
+    `SELECT s.* FROM submissions s JOIN homework h ON h.id = s.homework_id JOIN course_lessons l ON l.id = h.lesson_id
+     WHERE l.course_id = ? AND s.member_id = ?`).bind(course.id, me.id).all()).results : [];
+  return c.json({
+    course,
+    lessons: (lessons.results as any[]).map((l) => ({ ...l, content: canView || isAdmin ? l.content : null })),
+    homework: homework.results,
+    my_submissions: submissions,
+    enrolled: canView,
+  });
+});
+
+// --- lessons & homework (admin/teachers manage) ---
+app.post("/api/admin/courses/:slug/lessons", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const course = await c.env.DB.prepare(`SELECT id FROM courses WHERE slug = ?`).bind(c.req.param("slug")).first<any>();
+  if (!course) return err(c, 404, "course not found");
+  const b = await c.req.json().catch(() => null);
+  const title = str(b?.title, 120);
+  if (!title) return err(c, 400, "title required");
+  await c.env.DB.prepare(`INSERT INTO course_lessons (course_id, title, summary, content, sort) VALUES (?,?,?,?,?)`)
+    .bind(course.id, title, str(b?.summary, 500) ?? "", str(b?.content, 20000) ?? "", Number(b?.sort) || 0).run();
+  return c.json({ ok: true }, 201);
+});
+
+app.put("/api/admin/lessons/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  await c.env.DB.prepare(`UPDATE course_lessons SET title = ?, summary = ?, content = ?, sort = ? WHERE id = ?`)
+    .bind(str(b?.title, 120) ?? "", str(b?.summary, 500) ?? "", str(b?.content, 20000) ?? "", Number(b?.sort) || 0, Number(c.req.param("id"))).run();
+  return c.json({ ok: true });
+});
+
+app.delete("/api/admin/lessons/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  await c.env.DB.prepare(`DELETE FROM course_lessons WHERE id = ?`).bind(Number(c.req.param("id"))).run();
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/lessons/:id/homework", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const lesson = await c.env.DB.prepare(`SELECT id, course_id FROM course_lessons WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!lesson) return err(c, 404, "lesson not found");
+  const b = await c.req.json().catch(() => null);
+  const title = str(b?.title, 120);
+  if (!title) return err(c, 400, "title required");
+  await c.env.DB.prepare(`INSERT INTO homework (lesson_id, title, instructions, due_at) VALUES (?,?,?,?)`)
+    .bind(lesson.id, title, str(b?.instructions, 2000) ?? "", str(b?.due_at, 40)).run();
+  await c.env.DB.prepare(
+    `INSERT INTO notifications (member_id, text, type)
+     SELECT e.member_id, 'New homework in your course: ' || ? , 'course' FROM enrollments e WHERE e.course_id = ? AND e.status = 'approved'`)
+    .bind(title, lesson.course_id).run();
+  return c.json({ ok: true }, 201);
+});
+
+// member homework
+app.get("/api/my/homework", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const pending = await c.env.DB.prepare(
+    `SELECT h.id, h.title, h.instructions, h.due_at, l.title AS lesson_title, c.title AS course_title
+     FROM homework h JOIN course_lessons l ON l.id = h.lesson_id JOIN courses c ON c.id = l.course_id
+     JOIN enrollments e ON e.course_id = c.id AND e.member_id = ? AND e.status = 'approved'
+     WHERE h.id NOT IN (SELECT homework_id FROM submissions WHERE member_id = ?)
+     ORDER BY h.due_at`).bind(m.id, m.id).all();
+  const mine = await c.env.DB.prepare(
+    `SELECT s.*, h.title AS homework_title, h.due_at, l.title AS lesson_title, c.title AS course_title
+     FROM submissions s JOIN homework h ON h.id = s.homework_id JOIN course_lessons l ON l.id = h.lesson_id
+     JOIN courses c ON c.id = l.course_id WHERE s.member_id = ? ORDER BY s.created_at DESC`).bind(m.id).all();
+  return c.json({ pending: pending.results, mine: mine.results });
+});
+
+app.post("/api/my/homework/:id/submit", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const hw = await c.env.DB.prepare(
+    `SELECT h.id, l.course_id FROM homework h JOIN course_lessons l ON l.id = h.lesson_id WHERE h.id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!hw) return err(c, 404, "homework not found");
+  const enrolled = await c.env.DB.prepare(`SELECT 1 x FROM enrollments WHERE course_id = ? AND member_id = ? AND status = 'approved'`).bind(hw.course_id, m.id).first();
+  if (!enrolled) return err(c, 403, "enrollment required to submit homework");
+  const b = await c.req.json().catch(() => null);
+  const repo = str(b?.repo_url, 300);
+  if (!repo) return err(c, 400, "repo/submission link required");
+  await c.env.DB.prepare(
+    `INSERT INTO submissions (homework_id, member_id, repo_url, note) VALUES (?,?,?,?)
+     ON CONFLICT (homework_id, member_id) DO UPDATE SET repo_url = excluded.repo_url, note = excluded.note, status = 'pending', created_at = datetime('now')`)
+    .bind(hw.id, m.id, repo, str(b?.note, 1000) ?? "").run();
+  return c.json({ ok: true }, 201);
+});
+
+// admin grading
+app.get("/api/admin/submissions", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.*, mem.display_name, mem.username, h.title AS homework_title, l.title AS lesson_title, c.title AS course_title
+     FROM submissions s JOIN members mem ON mem.id = s.member_id JOIN homework h ON h.id = s.homework_id
+     JOIN course_lessons l ON l.id = h.lesson_id JOIN courses c ON c.id = l.course_id
+     ORDER BY s.status = 'pending' DESC, s.created_at DESC LIMIT 100`).all();
+  return c.json({ submissions: results });
+});
+
+app.post("/api/admin/submissions/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const s = await c.env.DB.prepare(`SELECT * FROM submissions WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!s) return err(c, 404, "not found");
+  const action = b?.action === "approve" ? "approved" : "rejected";
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE submissions SET status = ?, feedback = ? WHERE id = ?`).bind(action, str(b?.feedback, 500) ?? "", s.id),
+    c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'course')`).bind(s.member_id, `Your homework submission was ${action}${b?.feedback ? `: ${b.feedback}` : "."}`),
+    c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'grade', ?)`).bind(m.id, `submission ${s.id} -> ${action}`),
+  ]);
+  return c.json({ ok: true });
 });
 
 app.get("/api/columns", async (c) => {
@@ -371,6 +498,9 @@ app.post("/api/auth/register", async (c) => {
   if (under14 && (!guardianName || !guardianContact))
     return err(c, 400, "under 14 requires guardian name and contact for verification");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err(c, 400, "invalid email");
+  const emailOtp = String(b?.email_otp ?? "");
+  if (!emailOtp || !(await checkOtp(c.env.DB, email, "register", emailOtp)))
+    return err(c, 400, "a valid 6-digit email verification code is required (request one below the form)");
   const taken = await c.env.DB.prepare(`SELECT 1 x FROM members WHERE username = ? UNION SELECT 1 FROM applications WHERE username = ?`)
     .bind(username, username).first();
   if (taken) return err(c, 409, "username already taken");
@@ -381,6 +511,8 @@ app.post("/api/auth/register", async (c) => {
     `INSERT INTO applications (username, display_name, email, repo_url, statement, password_hash, salt, token, is_minor, guardian_name, guardian_contact)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
     .bind(username, display, email, repo, statement, hash, salt, token, isMinor, guardianName, guardianContact).run();
+  await c.env.DB.prepare(`UPDATE otp_codes SET used = 1 WHERE email = ? AND purpose = 'register'`).bind(email).run();
+  await c.env.DB.prepare(`UPDATE applications SET email_verified = 1 WHERE username = ?`).bind(username).run();
   return c.json({ token, status: "pending" }, 201);
 });
 
@@ -417,7 +549,7 @@ app.post("/api/auth/login", async (c) => {
   const ua = (c.req.header("User-Agent") ?? "").slice(0, 120);
   if (m.last_login_ip !== ip) {
     await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'security')`)
-      .bind(m.id, `New sign-in from ${ip}${ua ? ` · ${ua}` : ""}. If this wasn't you, change your password immediately.`).run();
+      .bind(m.id, `新的登录：来自 ${ip}${ua ? `（${ua}）` : ""}。如果不是你本人操作，请立即修改密码。`).run();
   }
   await c.env.DB.prepare(`UPDATE members SET last_login_ip = ?, last_login_at = datetime('now') WHERE id = ?`).bind(ip, m.id).run();
   await createSession(c, m.id);
@@ -615,6 +747,58 @@ async function repoStatsFor(c: { env: Bindings; executionCtx?: ExecutionContext 
   return after ? JSON.parse(after.data) : null;
 }
 
+// --- email OTP ---
+async function sendEmail(to: string, subject: string, text: string): Promise<{ dev?: string }> {
+  const webhook = process_env.EMAIL_WEBHOOK_URL;
+  if (webhook) {
+    await fetch(webhook, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to, subject, text }) });
+    return {};
+  }
+  console.log(`[dev-email] to=${to} subject=${subject}\n${text}`);
+  const m = text.match(/(\d{6})/);
+  return { dev: m?.[1] };
+}
+const process_env: any = (globalThis as any).process?.env ?? {};
+
+app.post("/api/auth/email-otp", async (c) => {
+  if (rateLimited(c.req.header("CF-Connecting-IP") ?? "local")) return err(c, 429, "too many attempts, wait a minute");
+  const b = await c.req.json().catch(() => null);
+  const email = str(b?.email, 120);
+  const purpose = b?.purpose === "reset" ? "reset" : "register";
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err(c, 400, "valid email required");
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const hash = await hashPassword(code, "otp-static-salt");
+  await c.env.DB.prepare(`UPDATE otp_codes SET used = 1 WHERE email = ? AND purpose = ?`).bind(email, purpose).run();
+  await c.env.DB.prepare(`INSERT INTO otp_codes (email, purpose, code_hash, expires_at) VALUES (?,?,?, datetime('now', '+10 minutes'))`).bind(email, purpose, hash).run();
+  const sent = await sendEmail(email, `Starisle ${purpose === "reset" ? "password reset" : "verification"} code: ${code}`, `Your code is ${code}. Valid 10 minutes.`);
+  return c.json({ ok: true, ...sent });
+});
+
+async function checkOtp(DB: D1Database, email: string, purpose: string, code: string): Promise<boolean> {
+  const row = await DB.prepare(`SELECT * FROM otp_codes WHERE email = ? AND purpose = ? AND used = 0 AND expires_at > datetime('now') ORDER BY id DESC`).bind(email, purpose).first<any>();
+  return !!row && (await hashPassword(code, "otp-static-salt")) === row.code_hash;
+}
+
+app.post("/api/auth/recover-email", async (c) => {
+  const b = await c.req.json().catch(() => null);
+  const email = str(b?.email, 120);
+  const code = String(b?.code ?? "");
+  const password = typeof b?.password === "string" ? b.password : "";
+  if (!email || !code || password.length < 8 || password.length > 72) return err(c, 400, "email, code and a new password (8–72) required");
+  if (!(await checkOtp(c.env.DB, email, "reset", code))) return err(c, 403, "invalid or expired code");
+  const m = await c.env.DB.prepare(`SELECT * FROM members WHERE email = ? AND status = 'active'`).bind(email).first<any>();
+  if (!m) return err(c, 404, "no account with this email");
+  const salt = newToken();
+  const hash = await hashPassword(password, salt);
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE otp_codes SET used = 1 WHERE email = ? AND purpose = 'reset'`).bind(email),
+    c.env.DB.prepare(`UPDATE members SET password_hash = ?, salt = ? WHERE id = ?`).bind(hash, salt, m.id),
+    c.env.DB.prepare(`DELETE FROM sessions WHERE member_id = ?`).bind(m.id),
+    c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'security')`).bind(m.id, "你的密码已通过邮箱验证码重置。"),
+  ]);
+  return c.json({ ok: true });
+});
+
 const slugify = (name: string) =>
   (name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, "-").replace(/^-+|-+$/g, "") || "project") + "-" + Math.random().toString(36).slice(2, 8);
 
@@ -728,7 +912,7 @@ app.get("/api/admin/applications", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
   const { results } = await c.env.DB.prepare(
-    `SELECT id, username, display_name, email, repo_url, statement, status, reason, is_minor, guardian_name, guardian_contact, created_at
+    `SELECT id, username, display_name, email, repo_url, statement, status, reason, is_minor, guardian_name, guardian_contact, email_verified, created_at
      FROM applications ORDER BY created_at DESC`).all();
   return c.json({ applications: results });
 });
@@ -742,6 +926,7 @@ app.post("/api/admin/applications/:id", async (c) => {
   const a = await c.env.DB.prepare(`SELECT * FROM applications WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
   if (!a) return err(c, 404, "application not found");
   if (a.status !== "pending") return err(c, 409, "already reviewed");
+  if (action === "approve" && !a.email_verified) return err(c, 409, "email not verified — ask the applicant to verify, or reject");
   if (action === "approve") {
     const r = await c.env.DB.prepare(
       `INSERT INTO members (username, display_name, email, repo_url, bio, password_hash, salt)

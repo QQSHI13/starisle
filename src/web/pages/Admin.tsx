@@ -61,6 +61,8 @@ export default function Admin() {
       <MembersAdmin />
       <MentorQueue />
       <AuditLog />
+      <CourseTools />
+      <GradingQueue />
       <AdminTools />
       <section style={{ padding: "0 0 28px" }}>
         <h3>{t.admin_enroll}</h3>
@@ -200,6 +202,92 @@ function MentorQueue() {
           <button className="btn small primary" onClick={() => decide(r.id, "approve")}>通过</button>{" "}
           <button className="btn small" onClick={() => decide(r.id, "contacted")}>已对接</button>{" "}
           <button className="btn small danger" onClick={() => decide(r.id, "reject")}>{t.reject}</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function CourseTools() {
+  const [tick, setTick] = useState(0);
+  const { data: courseData } = useFetch<{ courses: any[] }>("/courses", [tick]);
+  const [courseSlug, setCourseSlug] = useState("");
+  const [ltitle, setLtitle] = useState(""); const [lsummary, setLsummary] = useState(""); const [lcontent, setLcontent] = useState("");
+  const [lessonId, setLessonId] = useState(""); const [htitle, setHtitle] = useState(""); const [hdue, setHdue] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const lessons = useFetch<{ lessons: any[] }>(courseSlug ? null : null, []);
+  void lessons;
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>课程与作业 · Courses & homework</h3>
+      {msg && <div className="notice" role="status">{msg}</div>}
+      <div className="toolbar">
+        <select value={courseSlug} onChange={(e: any) => setCourseSlug(e.target.value)} style={{ width: "auto" }}>
+          <option value="">选择课程…</option>
+          {(courseData?.courses ?? []).map((c: any) => <option key={c.slug} value={c.slug}>{c.title}</option>)}
+        </select>
+      </div>
+      {courseSlug && (
+        <>
+          <form className="toolbar" onSubmit={async (e) => { e.preventDefault(); setMsg(null);
+            try { await api(`/admin/courses/${courseSlug}/lessons`, { method: "POST", body: JSON.stringify({ title: ltitle, summary: lsummary, content: lcontent }) }); setLtitle(""); setLsummary(""); setLcontent(""); setMsg("课时已添加"); } catch (e2: any) { setMsg(String(e2.message)); } }}>
+            <input type="text" required placeholder="课节标题" value={ltitle} onChange={(e: any) => setLtitle(e.target.value)} style={{ width: 160 }} />
+            <input type="text" placeholder="摘要" value={lsummary} onChange={(e: any) => setLsummary(e.target.value)} style={{ width: 160 }} />
+            <input type="text" placeholder="内容（对已开通成员可见）" value={lcontent} onChange={(e: any) => setLcontent(e.target.value)} style={{ width: 260 }} />
+            <button className="btn small primary">添加课节</button>
+          </form>
+          <form className="toolbar" onSubmit={async (e) => { e.preventDefault(); setMsg(null);
+            try { await api(`/admin/lessons/${lessonId}/homework`, { method: "POST", body: JSON.stringify({ title: htitle, due_at: hdue }) }); setHtitle(""); setMsg("作业已布置"); } catch (e2: any) { setMsg(String(e2.message)); } }}>
+            <input type="number" required placeholder="课节 ID" value={lessonId} onChange={(e: any) => setLessonId(e.target.value)} style={{ width: 100 }} />
+            <input type="text" required placeholder="作业标题" value={htitle} onChange={(e: any) => setHtitle(e.target.value)} style={{ width: 200 }} />
+            <input type="text" placeholder="截止时间 2026-10-01 20:00" value={hdue} onChange={(e: any) => setHdue(e.target.value)} style={{ width: 200 }} />
+            <button className="btn small primary">布置作业</button>
+          </form>
+          <LessonList slug={courseSlug} />
+        </>
+      )}
+    </section>
+  );
+}
+
+function LessonList({ slug }: { slug: string }) {
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ lessons: any[] }>(null, []);
+  void data; void tick; void setTick;
+  const { data: cd } = useFetch<{ lessons: any[] }>(`/courses/${slug}`, [slug]);
+  return (
+    <div>
+      {(cd?.lessons ?? []).map((l: any) => (
+        <div className="member-row" key={l.id}>
+          <span className="pill">#{l.id}</span>
+          <span className="bio" style={{ flex: 1 }}>{l.title}{l.summary ? ` — ${l.summary}` : ""}</span>
+          <button className="btn small danger" onClick={async () => { if (confirm("删除该课节及其作业？")) { await api(`/admin/lessons/${l.id}`, { method: "DELETE" }); location.reload(); } }}>删除</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GradingQueue() {
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ submissions: any[] }>("/admin/submissions", [tick]);
+  const items = (data?.submissions ?? []).filter((s: any) => s.status === "pending");
+  const grade = async (id: number, action: string) => {
+    const feedback = prompt(action === "approve" ? "评语（选填）" : "修改建议（会通知学生）") ?? "";
+    await api(`/admin/submissions/${id}`, { method: "POST", body: JSON.stringify({ action, feedback }) });
+    setTick((x) => x + 1);
+  };
+  if (items.length === 0) return null;
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>作业批改 · Grading ({items.length})</h3>
+      {items.map((s: any) => (
+        <div className="member-row" key={s.id}>
+          <span className="dname" style={{ fontSize: 15 }}>{s.display_name}{s.username ? `(${s.username})` : ""}</span>
+          <span className="bio" style={{ flex: 1 }}>{s.course_title} · {s.homework_title}</span>
+          <a className="btn small" href={s.repo_url} target="_blank" rel="noreferrer">查看</a>{" "}
+          <button className="btn small primary" onClick={() => grade(s.id, "approve")}>通过</button>{" "}
+          <button className="btn small danger" onClick={() => grade(s.id, "reject")}>打回</button>
         </div>
       ))}
     </section>

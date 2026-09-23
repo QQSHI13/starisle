@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS members (
   verified INTEGER NOT NULL DEFAULT 0,
   last_login_ip TEXT,
   last_login_at TEXT,
+  email_verified INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -40,6 +41,7 @@ CREATE TABLE IF NOT EXISTS applications (
   is_minor INTEGER NOT NULL DEFAULT 0,
   guardian_name TEXT,
   guardian_contact TEXT,
+  email_verified INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending',
   reason TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -268,4 +270,43 @@ CREATE TABLE IF NOT EXISTS audit_log (
   action TEXT NOT NULL,
   detail TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_codes(email, purpose, used);
+
+CREATE TABLE IF NOT EXISTS course_lessons (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  sort INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS homework (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lesson_id INTEGER NOT NULL REFERENCES course_lessons(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  instructions TEXT NOT NULL DEFAULT '',
+  due_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  homework_id INTEGER NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  repo_url TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  feedback TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (homework_id, member_id)
 );

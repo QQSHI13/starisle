@@ -63,10 +63,10 @@ jobs:
           curl -sf http://localhost:8787/api/columns | grep -q "columns"
           TOKEN=$(curl -sf -X POST http://localhost:8787/api/auth/register \
             -H 'Content-Type: application/json' \
-            -d '{"username":"ci-smoke-test","password":"ci-password-123","display_name":"CI","email":"ci@example.com","statement":"automated smoke test application","age":16,"consent_privacy":true,"consent_public":true}' | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])")
+            -d '{"email_otp":"000000","username":"ci-smoke-test,"password":"ci-password-123","display_name":"CI","email":"ci@example.com","statement":"automated smoke test application","age":16,"consent_privacy":true,"consent_public":true}' | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])")
           curl -sf -X POST http://localhost:8787/api/auth/application/status \
             -H 'Content-Type: application/json' \
-            -d '{"username":"ci-smoke-test","password":"ci-password-123"}' | grep -q pending
+            -d '{"email_otp":"000000","username":"ci-smoke-test,"password":"ci-password-123"}' | grep -q pending
           echo "smoke test passed, receipt: $TOKEN"
 
   deploy:

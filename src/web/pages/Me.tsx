@@ -67,6 +67,7 @@ export default function Me() {
         ))}
       </section>
 
+      <HomeworkInbox />
       <JoinInbox />
       <ProfileForm me={me} onSaved={refresh} />
       <Deactivate />
@@ -136,6 +137,38 @@ function NotificationManager() {
       </div>
     </div>
   );
+}
+
+function HomeworkInbox() {
+  const { data, refresh } = useH();
+  const pending = data?.pending ?? [];
+  const mine = data?.mine ?? [];
+  if (pending.length === 0 && mine.length === 0) return null;
+  return (
+    <section style={{ padding: "0 0 36px" }}>
+      <div className="block-head"><h2>我的作业</h2></div>
+      {pending.map((h: any) => (
+        <div className="member-row" key={h.id}>
+          <span className="pill gold">待提交</span>
+          <span className="bio" style={{ flex: 1 }}><b>{h.title}</b> · {h.course_title}（截止 {h.due_at?.slice(0, 10) ?? "—"}）</span>
+          <Link className="btn small" to={`/courses/${encodeURIComponent(h.course_slug ?? "")}`}>去课程页提交 →</Link>
+        </div>
+      ))}
+      {mine.slice(0, 5).map((s: any) => (
+        <div className="member-row" key={s.id}>
+          <span className="pill">{s.status === "approved" ? "已通过" : s.status === "rejected" ? "需修改" : "待批改"}</span>
+          <span className="bio" style={{ flex: 1 }}>{s.homework_title} · {s.course_title}{s.feedback ? ` · 反馈：${s.feedback}` : ""}</span>
+          <a className="btn small" href={s.repo_url} target="_blank" rel="noreferrer">查看提交</a>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function useH() {
+  const [tick, setTick] = useState(0);
+  const res = useFetch<{ pending: any[]; mine: any[] }>("/my/homework", [tick]);
+  return { data: res.data, refresh: () => setTick((x) => x + 1) };
 }
 
 function JoinInbox() {
