@@ -33,6 +33,7 @@ export default function Home() {
   const { data: proj } = useFetch<{ projects: Project[] }>("/projects");
   const { data: courseData } = useFetch<{ courses: any[] }>("/courses");
   const { data: colData } = useFetch<{ columns: any[] }>("/columns");
+  const { data: feed } = useFetch<{ updates: any[]; projects: any[]; events: any[] }>("/feed");
   const featured = proj?.projects?.slice(0, 4) ?? [];
   const statItems = [
     [stats?.members, t.stat_members], [stats?.projects, t.stat_projects],
@@ -104,8 +105,30 @@ export default function Home() {
 
       <section className="block">
         <div className="wrap">
+          <div className="block-head"><h2><span className="sec-num">03</span>{lang === "zh" ? "社区动态" : "Community pulse"}</h2></div>
+          <div className="grid">
+            {(feed?.updates ?? []).map((u, i) => (
+              <Link className="card" key={i} to={`/projects/${u.project_slug}`}>
+                <span className="pill">{u.project_name}</span>
+                <p className="tagline" style={{ color: "var(--ink)", fontSize: 14.5 }}>{u.text}</p>
+                <div className="meta"><span>{u.author}</span><span>{u.created_at.slice(0, 16)}</span></div>
+              </Link>
+            ))}
+            {(feed?.projects ?? []).map((pr) => (
+              <Link className="card" key={pr.slug} to={`/projects/${pr.slug}`}>
+                <span className="pill gold">{lang === "zh" ? "新项目" : "New project"}</span>
+                <h3>{pr.name}</h3>
+                <div className="meta"><span>{pr.owner}</span></div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="block">
+        <div className="wrap">
           <div className="block-head">
-            <h2><span className="sec-num">03</span>{t.columns_title}</h2>
+            <h2><span className="sec-num">04</span>{t.columns_title}</h2>
             <Link className="more" to="/columns">{t.all_projects} →</Link>
           </div>
           <div className="grid">

@@ -181,10 +181,11 @@ export default function App() {
 function NotFound() {
   const { t } = useLang();
   return (
-    <div className="form-page" style={{ textAlign: "center" }}>
-      <h1>404</h1>
+    <div className="form-page" style={{ textAlign: "center", paddingTop: 120 }}>
+      <p className="kicker">404</p>
+      <h1 className="serif" style={{ fontSize: 72, margin: "10px 0 16px" }}>∅</h1>
       <p className="sub">{t.not_found}</p>
-      <Link className="btn" to="/">{t.back_home}</Link>
+      <Link className="btn primary" to="/">{t.back_home}</Link>
     </div>
   );
 }

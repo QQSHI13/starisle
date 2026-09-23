@@ -535,6 +535,21 @@ app.get("/api/my/projects", async (c) => {
   return c.json({ projects: results });
 });
 
+app.get("/api/feed", async (c) => {
+  const updates = await c.env.DB.prepare(
+    `SELECT u.text, u.created_at, m.display_name AS author, p.name AS project_name, p.slug AS project_slug
+     FROM project_updates u JOIN projects p ON p.id = u.project_id AND p.status = 'approved'
+     JOIN members m ON m.id = u.author_id WHERE u.status = 'approved'
+     ORDER BY u.created_at DESC LIMIT 6`).all();
+  const projects = await c.env.DB.prepare(
+    `SELECT p.name, p.slug, p.tagline, m.display_name AS owner, p.created_at FROM projects p
+     JOIN members m ON m.id = p.owner_id WHERE p.status = 'approved'
+     ORDER BY p.created_at DESC LIMIT 3`).all();
+  const events = await c.env.DB.prepare(
+    `SELECT title, starts_at FROM activities WHERE starts_at >= datetime('now') ORDER BY starts_at LIMIT 2`).all();
+  return c.json({ updates: updates.results, projects: projects.results, events: events.results });
+});
+
 app.get("/api/showcase", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT slug, name, poster_url FROM projects WHERE status = 'approved' AND poster_url IS NOT NULL ORDER BY updated_at DESC`).all();

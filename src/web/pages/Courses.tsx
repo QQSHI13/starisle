@@ -68,7 +68,9 @@ export function CourseDetail() {
         </dl>
         {err && <div className="error-box" role="alert">{err}</div>}
         {msg && <div className="notice" role="status">{msg}</div>}
-        {me && <button className="btn primary" onClick={apply}>{t.apply_course}</button>}
+        <h3 style={{ marginTop: 30 }}>{t.nav_courses} · {c.lesson_count} {t.lessons}</h3>
+        <p className="dim" style={{ fontSize: 14 }}>课程大纲对所有人可见；报名并开通后可在站内查看各节内容与课件安排。</p>
+        {me && <button className="btn primary" onClick={apply} style={{ marginTop: 8 }}>{t.apply_course}</button>}
       </div></section>
     </>
   );

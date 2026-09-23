@@ -9,6 +9,9 @@ import { useState } from "react";
 export function Students() {
   const { t } = useLang();
   const { data } = useFetch<{ members: any[] }>("/members");
+  const [q, setQ] = useState("");
+  const members = (data?.members ?? []).filter((m) =>
+    !q.trim() || (m.display_name + (m.username ?? "") + (m.bio ?? "")).toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <>
       <div className="page-head"><div className="wrap">
@@ -17,7 +20,10 @@ export function Students() {
         <p className="sub">{t.students_sub}</p>
       </div></div>
       <section className="block"><div className="wrap">
-        {(data?.members ?? []).map((m) => (
+        <div className="toolbar">
+          <input type="text" placeholder="搜索成员…" value={q} onChange={(e: any) => setQ(e.target.value)} style={{ width: 260 }} aria-label="搜索成员" />
+        </div>
+        {members.map((m) => (
           <div className="member-row" key={m.username}>
             <Avatar name={m.display_name || m.username} src={m.avatar} />
             <span className="dname">{m.display_name}</span>
