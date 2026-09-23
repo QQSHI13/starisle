@@ -90,10 +90,16 @@ app.get("/api/domains", async (c) =>
 const projectCard = `
   SELECT p.*, d.name AS domain_name, d.color AS domain_color,
     (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id) AS member_count,
-    m.username AS owner_username, m.display_name AS owner_display
+    m.username AS owner_username, m.display_name AS owner_display, m.real_name_public AS owner_name_public
   FROM projects p
   LEFT JOIN domains d ON d.id = p.domain_id
   JOIN members m ON m.id = p.owner_id`;
+const redactOwner = (rows: any[], isAdmin: boolean, meUsername: string | null) =>
+  rows.map((r: any) => ({
+    ...r,
+    owner_username: r.owner_name_public || isAdmin || r.owner_username === meUsername ? r.owner_username : null,
+    owner_name_public: undefined,
+  }));
 
 app.get("/api/projects", async (c) => {
   const q = c.req.query("q")?.trim();
@@ -102,15 +108,18 @@ app.get("/api/projects", async (c) => {
   const binds: string[] = [];
   if (q) { sql += ` AND (p.name LIKE ? OR p.tagline LIKE ?)`; binds.push(`%${q}%`, `%${q}%`); }
   if (domain) { sql += ` AND p.domain_id = ?`; binds.push(domain); }
-  sql += ` ORDER BY p.featured DESC, p.updated_at DESC`;
+  sql += ` ORDER BY p.featured DESC, datetime(REPLACE(REPLACE(p.updated_at,'T',' '),'Z','')) DESC, p.id DESC`;
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all();
-  return c.json({ projects: results });
+  const viewer = await currentUser(c);
+  return c.json({ projects: redactOwner(results as any[], viewer?.role === "admin", viewer?.username ?? null) });
 });
 
 app.get("/api/projects/:slug", async (c) => {
-  const p = await c.env.DB.prepare(projectCard + ` WHERE p.slug = ? AND p.status = 'approved'`)
+  const viewer = await currentUser(c);
+  const raw = await c.env.DB.prepare(projectCard + ` WHERE p.slug = ? AND p.status = 'approved'`)
     .bind(c.req.param("slug")).first<any>();
-  if (!p) return err(c, 404, "project not found");
+  if (!raw) return err(c, 404, "project not found");
+  const p = redactOwner([raw], viewer?.role === "admin", viewer?.username ?? null)[0];
   const members = await c.env.DB.prepare(
     `SELECT m.username, m.display_name, pm.role FROM project_members pm
      JOIN members m ON m.id = pm.member_id WHERE pm.project_id = ?`).bind(p.id).all();
@@ -121,10 +130,7 @@ app.get("/api/projects/:slug", async (c) => {
   const milestones = await c.env.DB.prepare(
     `SELECT text, done FROM project_milestones WHERE project_id = ? ORDER BY sort, id`).bind(p.id).all();
   const followerCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM project_follows WHERE project_id = ?`).bind(p.id).first<any>();
-  const me = await currentUser(c);
-  const me2 = me;
-  const following = me ? await c.env.DB.prepare(`SELECT 1 x FROM project_follows WHERE project_id = ? AND member_id = ?`).bind(p.id, me.id).first() : null;
-  const viewer = me2;
+  const following = viewer ? await c.env.DB.prepare(`SELECT 1 x FROM project_follows WHERE project_id = ? AND member_id = ?`).bind(p.id, viewer.id).first() : null;
   const isMember = viewer && await c.env.DB.prepare(`SELECT 1 x FROM project_members WHERE project_id = ? AND member_id = ?`).bind(p.id, viewer.id).first();
   const isAdmin2 = viewer && viewer.role === "admin";
   const updates = await c.env.DB.prepare(
