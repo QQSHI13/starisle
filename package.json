@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bunx vite",
-    "dev:api": "bunx wrangler dev --port 8790",
+    "dev": "bash scripts/dev.sh",
     "build": "bunx vite build",
     "check": "bunx tsc --noEmit",
     "start": "bun src/server/node.ts",

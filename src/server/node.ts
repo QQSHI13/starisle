@@ -21,6 +21,7 @@ let DatabaseSync: DBClass;
     DatabaseSync = bun.Database;
   }
 }
+mkdirSync(join(ROOT, "data"), { recursive: true });
 const sqlite = new DatabaseSync(DB_PATH);
 sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
 
