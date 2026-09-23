@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS members (
   guardian_contact TEXT,
   real_name_public INTEGER NOT NULL DEFAULT 0,
   verified INTEGER NOT NULL DEFAULT 0,
+  last_login_ip TEXT,
+  last_login_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

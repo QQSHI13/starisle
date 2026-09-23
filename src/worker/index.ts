@@ -413,6 +413,13 @@ app.post("/api/auth/login", async (c) => {
   if (!username || !password) return err(c, 400, "username and password required");
   const m = await c.env.DB.prepare(`SELECT * FROM members WHERE username = ? AND status = 'active'`).bind(username).first<any>();
   if (!m || (await hashPassword(password, m.salt)) !== m.password_hash) return err(c, 401, "wrong username or password");
+  const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
+  const ua = (c.req.header("User-Agent") ?? "").slice(0, 120);
+  if (m.last_login_ip !== ip) {
+    await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'security')`)
+      .bind(m.id, `New sign-in from ${ip}${ua ? ` · ${ua}` : ""}. If this wasn't you, change your password immediately.`).run();
+  }
+  await c.env.DB.prepare(`UPDATE members SET last_login_ip = ?, last_login_at = datetime('now') WHERE id = ?`).bind(ip, m.id).run();
   await createSession(c, m.id);
   const { password_hash, salt, ...safe } = m;
   return c.json({ member: safe });
@@ -817,6 +824,56 @@ app.post("/api/admin/reports/:id", async (c) => {
     c.env.DB.prepare(`UPDATE reports SET status = ? WHERE id = ?`).bind(action, r.id),
     c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'report', ?)`).bind(m.id, detail),
   ]);
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/members/:id/status", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const status = b?.status === "deactivated" ? "deactivated" : "active";
+  const t = await c.env.DB.prepare(`SELECT id FROM members WHERE id = ? AND role != 'admin'`).bind(Number(c.req.param("id"))).first();
+  if (!t) return err(c, 404, "not found (or is an admin)");
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE members SET status = ? WHERE id = ?`).bind(status, t.id),
+    c.env.DB.prepare(`DELETE FROM sessions WHERE member_id = ?`).bind(t.id),
+    c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'member-status', ?)`).bind(m.id, `member ${t.id} -> ${status}`),
+  ]);
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/broadcast", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const text = str(b?.text, 500);
+  if (!text) return err(c, 400, "text required");
+  const audience = b?.audience === "minors" ? "AND is_minor = 1" : b?.audience === "adults" ? "AND is_minor = 0" : b?.audience === "verified" ? "AND verified = 1" : "";
+  const r = await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) SELECT id, ?, 'announce' FROM members WHERE status = 'active' ${audience}`).bind(text).run();
+  await c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'broadcast', ?)`).bind(m.id, `audience=${b?.audience ?? "all"} rows=${r.meta.changes}`).run();
+  return c.json({ ok: true, notified: r.meta.changes });
+});
+
+app.get("/api/admin/export", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const grab = async (sql: string) => (await c.env.DB.prepare(sql).all()).results;
+  const data = {
+    exported_at: new Date().toISOString(),
+    members: await grab(`SELECT id, username, display_name, email, role, status, is_minor, guardian_name, guardian_contact, verified, created_at FROM members`),
+    projects: await grab(`SELECT p.*, m.username AS owner_username FROM projects p JOIN members m ON m.id = p.owner_id`),
+    applications: await grab(`SELECT * FROM applications`),
+    reports: await grab(`SELECT * FROM reports`),
+    audit_log: await grab(`SELECT * FROM audit_log ORDER BY id DESC LIMIT 500`),
+  };
+  await c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'export', 'full data export')`).bind(m.id).run();
+  return c.json(data);
+});
+
+app.delete("/api/admin/applications/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  await c.env.DB.prepare(`DELETE FROM applications WHERE id = ?`).bind(Number(c.req.param("id"))).run();
   return c.json({ ok: true });
 });
 

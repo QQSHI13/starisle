@@ -33,7 +33,8 @@ export default function Admin() {
                 <td className="dim" style={{ maxWidth: 320 }}>{a.statement}</td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button className="btn small primary" onClick={() => decide("/admin/applications", a.id, "approve")}>{t.approve}</button>{" "}
-                  <Reject onOk={(reason) => decide("/admin/applications", a.id, "reject", reason)} label={t.reject} />
+                  <Reject onOk={(reason) => decide("/admin/applications", a.id, "reject", reason)} label={t.reject} />{" "}
+                  <button className="btn small danger" onClick={async () => { if (confirm("删除这条申请记录？")) { await api(`/admin/applications/${a.id}`, { method: "DELETE" }); refresh(); } }}>删除</button>
                 </td>
               </tr>
             ))}
@@ -167,7 +168,10 @@ function MembersAdmin() {
                 {!!m.is_minor && m.guardian_name && <span className="pill" title={m.guardian_contact}>{m.guardian_name}</span>}{" "}
                 {!!m.verified && <span className="pill gold">已认证</span>}
               </td>
-              <td><button className="btn small" onClick={() => verify(m.id)}>{m.verified ? "取消认证" : "认证"}</button></td>
+              <td style={{ whiteSpace: "nowrap" }}>
+                <button className="btn small" onClick={() => verify(m.id)}>{m.verified ? "取消认证" : "认证"}</button>{" "}
+                <button className="btn small danger" onClick={async () => { await api(`/admin/members/${m.id}/status`, { method: "POST", body: JSON.stringify({ status: m.status === "active" ? "deactivated" : "active" }) }); setTick((x) => x + 1); }}>{m.status === "active" ? "停用" : "启用"}</button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -205,10 +209,19 @@ function MentorQueue() {
 function AdminTools() {
   const { t } = useLang();
   const [msg, setMsg] = useState<string | null>(null);
+  const [audience, setAudience] = useState("all");
   const post = (path: string, body: any, ok: string, clear: () => void) => async (e: any) => {
     e.preventDefault();
     setMsg(null);
-    try { await api(path, { method: "POST", body: JSON.stringify(body) }); setMsg(ok); clear(); } catch (e: any) { setMsg(String(e.message)); }
+    try { const r = await api(path, { method: "POST", body: JSON.stringify(body) }); setMsg(`${ok}${r.notified != null ? `（${r.notified} 人）` : ""}`); clear(); } catch (e: any) { setMsg(String(e.message)); }
+  };
+  const exportData = async () => {
+    const data = await api("/admin/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `starisle-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
   };
   const [aTitle, setATitle] = useState(""); const [aDesc, setADesc] = useState(""); const [aWhen, setAWhen] = useState("");
   const [rName, setRName] = useState(""); const [rDesc, setRDesc] = useState("");
@@ -243,11 +256,18 @@ function AdminTools() {
           <button className="btn small primary" style={{ marginTop: 8 }}>发布</button>
         </div>
       </form>
-      <form onSubmit={post("/admin/announce", { text: ann }, "已广播给全体成员", () => setAnn(""))}>
-        <b>全员通知</b>
+      <form onSubmit={post("/admin/broadcast", { text: ann, audience }, "已发送", () => setAnn(""))}>
+        <b>定向通知</b>
         <div className="toolbar" style={{ marginTop: 8 }}>
-          <input type="text" placeholder="通知内容" value={ann} onChange={(e: any) => setAnn(e.target.value)} style={{ width: 420 }} required />
+          <select value={audience} onChange={(e: any) => setAudience(e.target.value)} style={{ width: "auto" }} aria-label="受众">
+            <option value="all">全体成员</option>
+            <option value="minors">仅未成年人</option>
+            <option value="adults">仅成年人</option>
+            <option value="verified">仅已认证成员</option>
+          </select>
+          <input type="text" placeholder="通知内容" value={ann} onChange={(e: any) => setAnn(e.target.value)} style={{ width: 360 }} required />
           <button className="btn small primary">发送</button>
+          <button className="btn small" type="button" onClick={exportData}>导出全部数据 ↓</button>
         </div>
       </form>
     </section>
