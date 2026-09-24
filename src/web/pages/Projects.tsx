@@ -8,6 +8,7 @@ import { Avatar } from "../Avatar";
 import { api } from "../api";
 import { useMe } from "../App";
 import { ProjectForm } from "./ProjectForm";
+import { Md } from "../Md";
 
 export function Projects() {
   const { t, lang } = useLang();
@@ -179,7 +180,7 @@ export function ProjectDetail() {
             ))}
           </>
         )}
-        {p.body && <div className="prose" style={{ padding: "24px 0" }}><p>{p.body}</p></div>}
+        {p.body && <div className="prose" style={{ padding: "24px 0" }}><Md text={p.body.replace(/\\n/g, "\n")} /></div>}
       </div></section>
     </>
   );
