@@ -817,7 +817,7 @@ app.get("/api/search", async (c) => {
   if (searchUrl) {
     try {
       const r = await fetch(`${searchUrl}?q=${encodeURIComponent(q)}`);
-      if (r.ok) return c.json({ ...(await r.json()), local });
+      if (r.ok) return c.json({ ...((await r.json()) as any), local });
     } catch { /* fall through to local */ }
   }
   return c.json(local);
