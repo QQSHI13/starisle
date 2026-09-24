@@ -199,6 +199,7 @@ app.post("/api/projects/:slug/updates", async (c) => {
   const text = str(b?.text, 1000);
   if (!text) return err(c, 400, "update text required");
   await c.env.DB.prepare(`INSERT INTO project_updates (project_id, author_id, text, status) VALUES (?,?,?, 'pending')`).bind(p.id, m.id, text).run();
+  await notifyMentions(c.env.DB, text, `项目「${p.name}」的动态`, m.display_name);
   return c.json({ ok: true, status: "pending" }, 201);
 });
 
@@ -421,8 +422,14 @@ app.post("/api/admin/submissions/:id", async (c) => {
 });
 
 app.get("/api/columns", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT id, slug, column_label, title, subtitle, author, author_title, published_at FROM columns ORDER BY published_at DESC`).all();
+  const topic = c.req.query("topic");
+  const kind = c.req.query("kind");
+  let sql = `SELECT id, slug, column_label, title, subtitle, author, topics, kind, published_at FROM columns WHERE 1=1`;
+  const args: any[] = [];
+  if (topic) { sql += ` AND topics LIKE ?`; args.push(`%#${topic}%`); }
+  if (kind) { sql += ` AND kind = ?`; args.push(kind); }
+  sql += ` ORDER BY published_at DESC`;
+  const { results } = await c.env.DB.prepare(sql).bind(...args).all();
   return c.json({ columns: results });
 });
 
@@ -655,6 +662,7 @@ app.post("/api/comments", async (c) => {
   if (!text || !targetId) return err(c, 400, "text and target required");
   await c.env.DB.prepare(`INSERT INTO comments (target_type, target_id, author_id, text) VALUES ('column',?,?,?)`)
     .bind(targetId, m.id, text).run();
+  await notifyMentions(c.env.DB, text, "一条评论", m.display_name);
   return c.json({ ok: true, status: "pending" }, 201);
 });
 
@@ -784,6 +792,18 @@ app.get("/api/my/projects", async (c) => {
      FROM projects p WHERE p.owner_id = ? ORDER BY p.created_at DESC`).bind(m.id).all();
   return c.json({ projects: results });
 });
+
+async function notifyMentions(DB: D1Database, text: string, source: string, actorName: string) {
+  const seen = new Set<string>();
+  for (const match of text.matchAll(/@([\w\u4e00-\u9fff\u3400-\u4dbf.-]{2,40})/g)) {
+    const uname = match[1];
+    if (seen.has(uname)) continue;
+    seen.add(uname);
+    const t = await DB.prepare(`SELECT id, display_name FROM members WHERE (username = ? OR display_name = ?) AND status = 'active'`).bind(uname, uname).first<any>();
+    if (t) await DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'mention')`)
+      .bind(t.id, `${actorName} 在${source}中提到了你。`, ).run();
+  }
+}
 
 app.get("/api/feed", async (c) => {
   const updates = await c.env.DB.prepare(
@@ -1127,7 +1147,7 @@ app.post("/api/admin/members/:id/status", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
   const b = await c.req.json().catch(() => null);
-  const status = b?.status === "deactivated" ? "deactivated" : "active";
+  const status = ["deactivated", "suspended"].includes(b?.status) ? b.status : "active";
   const t = await c.env.DB.prepare(`SELECT id FROM members WHERE id = ? AND role != 'admin'`).bind(Number(c.req.param("id"))).first();
   if (!t) return err(c, 404, "not found (or is an admin)");
   await c.env.DB.batch([
@@ -1271,9 +1291,11 @@ app.post("/api/admin/columns", async (c) => {
   const text = str(b?.text, 20000);
   if (!title || !text) return err(c, 400, "title and text required");
   const slug = "col-" + Math.random().toString(36).slice(2, 8);
+  const topics = (String(b?.text ?? "").match(/#([\w\u4e00-\u9fff-]{2,30})/g) ?? []).join(" ");
   await c.env.DB.prepare(
-    `INSERT INTO columns (slug, column_label, title, subtitle, author, author_title, text) VALUES (?,?,?,?,?,?,?)`)
-    .bind(slug, str(b?.column_label, 60) ?? "社区投稿", title, str(b?.subtitle, 300) ?? "", m.display_name, "", text).run();
+    `INSERT INTO columns (slug, column_label, title, subtitle, author, author_title, text, kind, topics) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .bind(slug, str(b?.column_label, 60) ?? "社区投稿", title, str(b?.subtitle, 300) ?? "", m.display_name, "", text,
+      ["article", "note", "showcase", "question"].includes(b?.kind) ? b.kind : "article", topics).run();
   return c.json({ slug }, 201);
 });
 
