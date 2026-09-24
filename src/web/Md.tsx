@@ -2,31 +2,48 @@ import { useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 
 // Lazy loaders — heavy libraries load from CDN only when content needs them.
+const CDN = ["https://cdn.jsdelivr.net/npm", "https://unpkg.com", "https://cdnjs.cloudflare.com/ajax"];
+const tryImport = async (paths: string[]) => {
+  for (const base of CDN) {
+    for (const p of paths) {
+      const url = p.startsWith("http") ? p : `${base}/${p}`;
+      try { return await import(/* @vite-ignore */ url); } catch { /* try next */ }
+    }
+  }
+  throw new Error("all CDNs unreachable");
+};
 let katexLoading: Promise<any> | null = null;
 const loadKatex = () => {
   if (!katexLoading) {
     katexLoading = Promise.all([
-      // @ts-ignore CDN import
-      import("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.mjs"),
-      new Promise((res) => {
-        const l = document.createElement("link");
-        l.rel = "stylesheet";
-        l.href = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
-        l.onload = res;
-        document.head.appendChild(l);
+      tryImport(["katex@0.16.11/dist/katex.min.mjs", "katex@0.16.11/dist/katex.min.js", "katex/0.16.11/katex.min.mjs"]).then((m) => m.default ?? m),
+      new Promise<void>((res) => {
+        let i = 0;
+        const attempt = () => {
+          if (i >= CDN.length) return res();
+          const l = document.createElement("link");
+          l.rel = "stylesheet";
+          l.href = `${CDN[i]}/katex@0.16.11/dist/katex.min.css`;
+          i++;
+          l.onload = () => res();
+          l.onerror = () => attempt();
+          document.head.appendChild(l);
+        };
+        attempt();
       }),
-    ]);
+    ]).catch(() => null);
   }
   return katexLoading;
 };
 let mermaidLoading: Promise<any> | null = null;
 const loadMermaid = () => {
   if (!mermaidLoading) {
-    // @ts-ignore CDN import
-    mermaidLoading = import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs").then((m) => {
-      m.default.initialize({ startOnLoad: false, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral" });
-      return m.default;
-    });
+    mermaidLoading = tryImport(["mermaid@11/dist/mermaid.esm.min.mjs", "mermaid@11/dist/mermaid.min.js", "mermaid/11.4.0/mermaid.esm.min.mjs"])
+      .then((m) => {
+        const lib = m.default ?? m;
+        lib.initialize({ startOnLoad: false, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral" });
+        return lib;
+      }).catch(() => null);
   }
   return mermaidLoading;
 };
@@ -50,7 +67,9 @@ export function Md({ text }: { text: string }) {
     if (!ref.current || ready === 0) return;
     (async () => {
       if (hasMath) {
-        const katex = (await loadKatex())[0].default;
+        const k = await loadKatex();
+        if (!k) return;
+        const katex = k[0];
         ref.current!.querySelectorAll(".math-block, .math-inline").forEach((el) => {
           if ((el as any).dataset.done) return;
           try {
@@ -61,6 +80,7 @@ export function Md({ text }: { text: string }) {
       }
       if (hasMermaid) {
         const mermaid = await loadMermaid();
+        if (!mermaid) return;
         const nodes = [...ref.current!.querySelectorAll("pre code.language-mermaid")];
         for (const [i, node] of nodes.entries()) {
           if ((node.parentElement as any)?.dataset.done) continue;

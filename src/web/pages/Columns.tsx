@@ -12,7 +12,7 @@ function Comments({ targetId }: { targetId: number }) {
   const { me } = useMe();
   const [tick, setTick] = useState(0);
   const [text, setText] = useState("");
-  const { data } = useFetch<{ comments: any[] }>(`/columns/comments?target=${targetId}`, [tick, targetId]);
+  const { data } = useFetch<{ comments: any[] }>(`/comments/list?target=${targetId}`, [tick, targetId]);
   const [note, setNote] = useState<string | null>(null);
   const items = data?.comments ?? [];
   return (

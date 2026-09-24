@@ -634,7 +634,7 @@ app.post("/api/auth/recover", async (c) => {
   return c.json({ ok: true });
 });
 
-app.get("/api/columns/comments", async (c) => {
+app.get("/api/comments/list", async (c) => {
   const target = Number(c.req.query("target"));
   if (!target) return err(c, 400, "target required");
   const me = await currentUser(c);
