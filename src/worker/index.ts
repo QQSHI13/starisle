@@ -248,7 +248,7 @@ app.post("/api/projects/:slug/join", async (c) => {
      ON CONFLICT (project_id, member_id) DO UPDATE SET message = excluded.message, status = 'pending'`)
     .bind(p.id, m.id, str(b?.message, 500) ?? "").run();
   await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
-    .bind(p.owner_id, `${m.display_name} requested to join "${p.name}". Review: /admin or project members.`).run();
+    .bind(p.owner_id, `${m.display_name} requested to join "${p.name}". Review: /admin or project members.`, "join").run();
   return c.json({ ok: true }, 201);
 });
 
@@ -278,7 +278,7 @@ app.post("/api/my/join-requests/:id", async (c) => {
       ? [c.env.DB.prepare(`INSERT OR IGNORE INTO project_members (project_id, member_id, role) VALUES (?,?, 'member')`).bind(j.pid, j.member_id)]
       : []),
     c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
-      .bind(j.member_id, `Your request to join "${j.name}" was ${action}.`),
+      .bind(j.member_id, `Your request to join "${j.name}" was ${action}.`, "join"),
   ]);
   return c.json({ ok: true });
 });
@@ -396,7 +396,7 @@ app.post("/api/my/homework/:id/submit", async (c) => {
 // admin grading
 app.get("/api/admin/submissions", async (c) => {
   const m = await currentUser(c);
-  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  if (!isStaff(m)) return err(c, 403, "staff only");
   const { results } = await c.env.DB.prepare(
     `SELECT s.*, mem.display_name, mem.username, h.title AS homework_title, l.title AS lesson_title, c.title AS course_title
      FROM submissions s JOIN members mem ON mem.id = s.member_id JOIN homework h ON h.id = s.homework_id
@@ -407,7 +407,7 @@ app.get("/api/admin/submissions", async (c) => {
 
 app.post("/api/admin/submissions/:id", async (c) => {
   const m = await currentUser(c);
-  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  if (!isStaff(m)) return err(c, 403, "staff only");
   const b = await c.req.json().catch(() => null);
   const s = await c.env.DB.prepare(`SELECT * FROM submissions WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
   if (!s) return err(c, 404, "not found");
@@ -415,7 +415,7 @@ app.post("/api/admin/submissions/:id", async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare(`UPDATE submissions SET status = ?, feedback = ? WHERE id = ?`).bind(action, str(b?.feedback, 500) ?? "", s.id),
     c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'course')`).bind(s.member_id, `Your homework submission was ${action}${b?.feedback ? `: ${b.feedback}` : "."}`),
-    c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'grade', ?)`).bind(m.id, `submission ${s.id} -> ${action}`),
+    c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'grade', ?)`).bind(m!.id, `submission ${s.id} -> ${action}`),
   ]);
   return c.json({ ok: true });
 });
@@ -690,6 +690,52 @@ app.delete("/api/admin/columns/:id", async (c) => {
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
   await c.env.DB.prepare(`DELETE FROM columns WHERE id = ?`).bind(Number(c.req.param("id"))).run();
   return c.json({ ok: true });
+});
+
+const isStaff = (m: any): boolean => !!m && (m.role === "admin" || m.role === "teacher");
+
+// ---------- DM (allowed only if at least one side is teacher/admin) ----------
+app.get("/api/dm", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const withKey = c.req.query("with");
+  if (withKey) {
+    const other: any = await c.env.DB.prepare(`SELECT id, username, display_name, avatar, role FROM members WHERE (username = ? OR id = ?) AND status = 'active'`)
+      .bind(withKey, /^\d+$/.test(withKey) ? Number(withKey) : -1).first();
+    if (!other) return err(c, 404, "member not found");
+    if (!isStaff(m) && !isStaff(other)) return err(c, 403, "messages require a teacher or admin on one side");
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM messages WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?) ORDER BY created_at LIMIT 200`)
+      .bind(m.id, other.id, other.id, m.id).all();
+    await c.env.DB.prepare(`UPDATE messages SET read = 1 WHERE from_id = ? AND to_id = ?`).bind(other.id, m.id).run();
+    return c.json({ with: other, messages: results });
+  }
+  const { results } = await c.env.DB.prepare(
+    `SELECT mem.id, mem.username, mem.display_name, mem.role,
+       (SELECT text FROM messages x WHERE (x.from_id = mem.id AND x.to_id = ?) OR (x.from_id = ? AND x.to_id = mem.id) ORDER BY x.created_at DESC LIMIT 1) AS last_text,
+       (SELECT created_at FROM messages x WHERE (x.from_id = mem.id AND x.to_id = ?) OR (x.from_id = ? AND x.to_id = mem.id) ORDER BY x.created_at DESC LIMIT 1) AS last_at,
+       (SELECT COUNT(*) FROM messages x WHERE x.from_id = mem.id AND x.to_id = ? AND x.read = 0) AS unread
+     FROM messages msg JOIN members mem ON mem.id = CASE WHEN msg.from_id = ? THEN msg.to_id ELSE msg.from_id END
+     WHERE msg.from_id = ? OR msg.to_id = ?
+     GROUP BY mem.id ORDER BY last_at DESC`).bind(m.id, m.id, m.id, m.id, m.id, m.id, m.id, m.id).all();
+  return c.json({ conversations: results });
+});
+
+app.post("/api/dm", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const b = await c.req.json().catch(() => null);
+  const text = str(b?.text, 2000);
+  const toUsername = str(b?.to, 60);
+  if (!text || !toUsername) return err(c, 400, "to and text required");
+  const other: any = await c.env.DB.prepare(`SELECT id, role, status FROM members WHERE (username = ? OR CAST(id AS TEXT) = ?) AND status = 'active'`)
+    .bind(toUsername, toUsername).first();
+  if (!other) return err(c, 404, "member not found");
+  if (!isStaff(m) && !isStaff(other)) return err(c, 403, "messages require a teacher or admin on one side");
+  await c.env.DB.prepare(`INSERT INTO messages (from_id, to_id, text) VALUES (?,?,?)`).bind(m.id, other.id, text).run();
+  await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'dm')`)
+    .bind(other.id, `${m.display_name} 给你发了一条私信。`).run();
+  return c.json({ ok: true }, 201);
 });
 
 // ---------- logged-in ----------
@@ -1031,7 +1077,7 @@ app.post("/api/admin/projects/:id", async (c) => {
   await c.env.DB.prepare(`UPDATE projects SET status = ?, updated_at = datetime('now') WHERE id = ?`)
     .bind(status, p.id).run();
   await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
-    .bind(p.owner_id, `Your project "${p.name}" was ${status}. ${str(b?.reason, 300) ?? ""}`.trim()).run();
+    .bind(p.owner_id, `Your project "${p.name}" was ${status}. ${str(b?.reason, 300) ?? ""}`.trim(), "project").run();
   return c.json({ ok: true });
 });
 
@@ -1147,6 +1193,20 @@ app.get("/api/admin/audit", async (c) => {
   return c.json({ entries: results });
 });
 
+app.post("/api/admin/members/:id/role", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const role = ["member", "teacher", "admin"].includes(b?.role) ? b.role : null;
+  if (!role) return err(c, 400, "role must be member/teacher/admin");
+  const t = await c.env.DB.prepare(`SELECT id, role FROM members WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!t) return err(c, 404, "not found");
+  if (t.role === "admin" && role !== "admin") return err(c, 409, "cannot demote an admin");
+  await c.env.DB.prepare(`UPDATE members SET role = ? WHERE id = ?`).bind(role, t.id).run();
+  await c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'role', ?)`).bind(m.id, `member ${t.id} -> ${role}`).run();
+  return c.json({ ok: true });
+});
+
 app.post("/api/admin/members/:id/verify", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
@@ -1247,7 +1307,7 @@ app.post("/api/admin/mentor-requests/:id", async (c) => {
   if (!r) return err(c, 404, "not found");
   await c.env.DB.prepare(`UPDATE mentor_requests SET status = ? WHERE id = ?`).bind(action, r.id).run();
   await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, ?)`)
-    .bind(r.member_id, `Your mentoring request was marked "${action}".`).run();
+    .bind(r.member_id, `Your mentoring request was marked "${action}".`, "mentor").run();
   return c.json({ ok: true });
 });
 

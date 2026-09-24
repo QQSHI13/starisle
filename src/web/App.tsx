@@ -13,6 +13,7 @@ import { Activities, Resources, Privacy } from "./pages/Static";
 import { Apply, ApplyQuery, Login, Recovery } from "./pages/Auth";
 import Me from "./pages/Me";
 import Admin from "./pages/Admin";
+import DM from "./pages/DM";
 
 export type Member = {
   id: number; username: string; display_name: string; role: string;
@@ -34,7 +35,7 @@ const Star = () => (
 );
 
 function UserMenu() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { me, logout } = useMe();
   const nav = useNavigate();
   const [items, setItems] = useState<any[]>([]);
@@ -68,6 +69,7 @@ function UserMenu() {
           </Link>
         ))}
         <div className="umenu-foot">
+          <Link to="/dm" className="umenu-link">{lang === "zh" ? "私信" : "Messages"}</Link>
           <Link to="/me" className="umenu-link">{t.me} →</Link>
           {me!.role === "admin" && <Link to="/admin" className="umenu-link">{t.admin}</Link>}
           <button className="umenu-link" onClick={() => { logout(); nav("/"); }}>{t.logout}</button>
@@ -171,6 +173,7 @@ export default function App() {
           <Route path="/account-recovery" element={<Recovery />} />
           <Route path="/me" element={<Me />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/dm" element={<DM />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
@@ -179,7 +182,7 @@ export default function App() {
 }
 
 function NotFound() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   return (
     <div className="form-page" style={{ textAlign: "center", paddingTop: 120 }}>
       <p className="kicker">404</p>

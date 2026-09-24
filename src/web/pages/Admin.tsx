@@ -175,6 +175,10 @@ function MembersAdmin() {
               </td>
               <td style={{ whiteSpace: "nowrap" }}>
                 <button className="btn small" onClick={() => verify(m.id)}>{m.verified ? "取消认证" : "认证"}</button>{" "}
+                <button className="btn small" onClick={async () => {
+                  const role = prompt("设置角色：member / teacher / admin", m.role);
+                  if (role && ["member","teacher","admin"].includes(role)) { await api(`/admin/members/${m.id}/role`, { method: "POST", body: JSON.stringify({ role }) }); setTick((x) => x + 1); }
+                }}>{m.role === "admin" ? "管理" : m.role === "teacher" ? "导师" : "成员"}</button>{" "}
                 <button className="btn small danger" onClick={async () => { await api(`/admin/members/${m.id}/status`, { method: "POST", body: JSON.stringify({ status: m.status === "active" ? "deactivated" : "active" }) }); setTick((x) => x + 1); }}>{m.status === "active" ? "停用" : "启用"}</button>
               </td>
             </tr>
