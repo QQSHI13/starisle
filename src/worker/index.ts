@@ -805,6 +805,24 @@ async function notifyMentions(DB: D1Database, text: string, source: string, acto
   }
 }
 
+app.get("/api/search", async (c) => {
+  const q = (c.req.query("q") ?? "").trim().slice(0, 80);
+  if (!q) return c.json({ results: [] });
+  const like = `%${q}%`;
+  const projects = await c.env.DB.prepare(`SELECT slug, name, tagline FROM projects WHERE status='approved' AND (name LIKE ? OR tagline LIKE ? OR body LIKE ?) LIMIT 8`).bind(like, like, like).all();
+  const columns = await c.env.DB.prepare(`SELECT slug, title, subtitle, topics, kind FROM columns WHERE title LIKE ? OR text LIKE ? OR topics LIKE ? LIMIT 8`).bind(like, like, like).all();
+  const members = await c.env.DB.prepare(`SELECT id, display_name, bio FROM members WHERE status='active' AND (display_name LIKE ? OR bio LIKE ?) LIMIT 8`).bind(like, like).all();
+  const local = { projects: projects.results, columns: columns.results, members: members.results };
+  const searchUrl = process_env.SEARCH_URL;
+  if (searchUrl) {
+    try {
+      const r = await fetch(`${searchUrl}?q=${encodeURIComponent(q)}`);
+      if (r.ok) return c.json({ ...(await r.json()), local });
+    } catch { /* fall through to local */ }
+  }
+  return c.json(local);
+});
+
 app.get("/api/feed", async (c) => {
   const updates = await c.env.DB.prepare(
     `SELECT u.text, u.created_at, m.display_name AS author, p.name AS project_name, p.slug AS project_slug

@@ -14,6 +14,7 @@ import { Apply, ApplyQuery, Login, Recovery } from "./pages/Auth";
 import Me from "./pages/Me";
 import Admin from "./pages/Admin";
 import DM from "./pages/DM";
+import Search from "./pages/Search";
 
 export type Member = {
   id: number; username: string; display_name: string; role: string;
@@ -33,6 +34,16 @@ const Star = () => (
     <path d="M12 2.2 14.3 9.7 21.8 12 14.3 14.3 12 21.8 9.7 14.3 2.2 12 9.7 9.7Z" />
   </svg>
 );
+
+function SearchBox() {
+  const nav = useNavigate();
+  const [q, setQ] = useState("");
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) nav(`/search?q=${encodeURIComponent(q.trim())}`); }} style={{ marginRight: 4 }}>
+      <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索…" aria-label="搜索" style={{ width: 110, padding: "5px 10px", fontSize: 13, borderRadius: 999 }} />
+    </form>
+  );
+}
 
 function UserMenu() {
   const { t, lang } = useLang();
@@ -98,6 +109,7 @@ function Layout({ children }: { children: ReactNode }) {
             <Star /> 星屿 <small>STARISLE</small>
           </Link>
           <nav className="main" aria-label="main">
+            <SearchBox />
             {links.map(([to, label]) => (
               <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "active" : "")}>
                 {label}
@@ -174,6 +186,7 @@ export default function App() {
           <Route path="/me" element={<Me />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/dm" element={<DM />} />
+          <Route path="/search" element={<Search />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
