@@ -801,7 +801,7 @@ async function notifyMentions(DB: D1Database, text: string, source: string, acto
     seen.add(uname);
     const t = await DB.prepare(`SELECT id, display_name FROM members WHERE (username = ? OR display_name = ?) AND status = 'active'`).bind(uname, uname).first<any>();
     if (t) await DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'mention')`)
-      .bind(t.id, `${actorName} 在${source}中提到了你。`, ).run();
+      .bind(t.id, `${actorName} 在${source}中提到了你。`, 'mention').run();
   }
 }
 
