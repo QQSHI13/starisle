@@ -62,8 +62,8 @@ function UserMenu() {
           <span>{t.notifications}{unread > 0 ? ` · ${unread}` : ""}</span>
           {unread > 0 && <button className="umenu-link" onClick={markAll}>{t.mark_all_read}</button>}
         </div>
-        {items.length === 0 && <div className="umenu-empty">—</div>}
-        {items.slice(0, 5).map((n) => (
+        {items.filter((n) => !n.read).length === 0 && <div className="umenu-empty">{lang === "zh" ? "没有未读消息" : "All caught up"}</div>}
+        {items.filter((n) => !n.read).slice(0, 5).map((n) => (
           <Link key={n.id} to="/me" className={`umenu-item${n.read ? " read" : ""}`}>
             {n.text}
           </Link>

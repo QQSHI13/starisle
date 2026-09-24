@@ -65,7 +65,7 @@ const DB = {
 const { default: app } = await import("../worker/index.ts");
 
 // --- short-TTL cache for hot public GET endpoints ---
-const CACHEABLE = ["/api/stats", "/api/projects", "/api/courses", "/api/members", "/api/mentors", "/api/columns", "/api/partners", "/api/domains", "/api/activities", "/api/resources"];
+const CACHEABLE = ["/api/stats", "/api/projects", "/api/courses", "/api/members", "/api/mentors", "/api/columns", "/api/partners", "/api/domains" ];
 const cache = new Map<string, { exp: number; body: string; headers: Record<string, string> }>();
 const CACHE_TTL = 10_000;
 const cacheKey = (method: string, url: URL) => (method === "GET" && (CACHEABLE.includes(url.pathname) || url.pathname.startsWith("/api/projects?")) ? url.pathname + url.search : null);
