@@ -310,3 +310,14 @@ CREATE TABLE IF NOT EXISTS submissions (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (homework_id, member_id)
 );
+
+CREATE TABLE IF NOT EXISTS comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_type TEXT NOT NULL DEFAULT 'column',
+  target_id INTEGER NOT NULL,
+  author_id INTEGER NOT NULL REFERENCES members(id),
+  text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_comments_target ON comments(target_type, target_id, status);

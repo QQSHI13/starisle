@@ -633,6 +633,65 @@ app.post("/api/auth/recover", async (c) => {
   return c.json({ ok: true });
 });
 
+app.get("/api/columns/comments", async (c) => {
+  const target = Number(c.req.query("target"));
+  if (!target) return err(c, 400, "target required");
+  const me = await currentUser(c);
+  const sql = me
+    ? `SELECT cm.*, m.display_name, m.avatar FROM comments cm JOIN members m ON m.id = cm.author_id
+       WHERE cm.target_type = 'column' AND cm.target_id = ? AND (cm.status = 'approved' OR cm.author_id = ?) ORDER BY cm.created_at`
+    : `SELECT cm.*, m.display_name, m.avatar FROM comments cm JOIN members m ON m.id = cm.author_id
+       WHERE cm.target_type = 'column' AND cm.target_id = ? AND cm.status = 'approved' ORDER BY cm.created_at`;
+  const { results } = await c.env.DB.prepare(sql).bind(...(me ? [target, me.id] : [target])).all();
+  return c.json({ comments: results });
+});
+
+app.post("/api/comments", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const b = await c.req.json().catch(() => null);
+  const text = str(b?.text, 2000);
+  const targetId = Number(b?.target_id);
+  if (!text || !targetId) return err(c, 400, "text and target required");
+  await c.env.DB.prepare(`INSERT INTO comments (target_type, target_id, author_id, text) VALUES ('column',?,?,?)`)
+    .bind(targetId, m.id, text).run();
+  return c.json({ ok: true, status: "pending" }, 201);
+});
+
+app.get("/api/admin/comments", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const { results } = await c.env.DB.prepare(
+    `SELECT cm.*, mem.display_name AS author, col.title AS column_title FROM comments cm
+     JOIN members mem ON mem.id = cm.author_id LEFT JOIN columns col ON col.id = cm.target_id
+     WHERE cm.status = 'pending' ORDER BY cm.created_at`).all();
+  return c.json({ comments: results });
+});
+
+app.post("/api/admin/comments/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const status = b?.action === "approve" ? "approved" : "rejected";
+  const cm = await c.env.DB.prepare(`SELECT * FROM comments WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!cm) return err(c, 404, "not found");
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE comments SET status = ? WHERE id = ?`).bind(status, cm.id),
+    c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) VALUES (?, ?, 'general')`)
+      .bind(cm.author_id, `Your comment was ${status}.`),
+    c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'comment', ?)`)
+      .bind(m.id, `comment ${cm.id} -> ${status}`),
+  ]);
+  return c.json({ ok: true });
+});
+
+app.delete("/api/admin/columns/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  await c.env.DB.prepare(`DELETE FROM columns WHERE id = ?`).bind(Number(c.req.param("id"))).run();
+  return c.json({ ok: true });
+});
+
 // ---------- logged-in ----------
 app.post("/api/my/mentor-requests", async (c) => {
   const m = await currentUser(c);
@@ -818,7 +877,7 @@ app.post("/api/my/projects", async (c) => {
   const slug = slugify(name);
   const r = await c.env.DB.prepare(
     `INSERT INTO projects (slug, name, tagline, body, repo_url, demo_url, poster_url, domain_id, status, owner_id)
-     VALUES (?,?,?,?,?,?,?,'pending',?)`)
+     VALUES (?,?,?,?,?,?,?,?,'pending',?)`)
     .bind(slug, name, tagline, str(b?.body, 5000) ?? "", str(b?.repo_url, 300), str(b?.demo_url, 300), str(b?.poster_url, 300), str(b?.domain_id, 40), m.id).run();
   const id = r.meta.last_row_id;
   await c.env.DB.prepare(`INSERT INTO project_members (project_id, member_id, role) VALUES (?,?, 'owner')`).bind(id, m.id).run();

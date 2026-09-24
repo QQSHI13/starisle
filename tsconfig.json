@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "types": ["@cloudflare/workers-types", "vite/client", "node"],
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "noImplicitAny": false
   },
   "include": ["src"]
 }

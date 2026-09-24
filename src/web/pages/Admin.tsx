@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useLang } from "../i18n";
 import { api } from "../api";
@@ -59,6 +60,8 @@ export default function Admin() {
       <UpdatesQueue />
       <ReportsQueue />
       <MembersAdmin />
+      <CommentsQueue />
+      <ColumnsAdmin />
       <MentorQueue />
       <AuditLog />
       <CourseTools />
@@ -178,6 +181,45 @@ function MembersAdmin() {
           ))}
         </tbody>
       </table>
+    </section>
+  );
+}
+
+function CommentsQueue() {
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ comments: any[] }>("/admin/comments", [tick]);
+  const items = data?.comments ?? [];
+  const decide = async (id: number, action: string) => { await api(`/admin/comments/${id}`, { method: "POST", body: JSON.stringify({ action }) }); setTick((x) => x + 1); };
+  if (items.length === 0) return null;
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>评论审核 · Comments ({items.length})</h3>
+      {items.map((cm: any) => (
+        <div className="member-row" key={cm.id}>
+          <span className="bio" style={{ flex: 1 }}><b>{cm.author}</b> 在《{cm.column_title}》:{cm.text}</span>
+          <button className="btn small primary" onClick={() => decide(cm.id, "approve")}>通过</button>{" "}
+          <button className="btn small danger" onClick={() => decide(cm.id, "reject")}>拒绝</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ColumnsAdmin() {
+  const [tick, setTick] = useState(0);
+  const { data } = useFetch<{ columns: any[] }>("/columns", [tick]);
+  const items = data?.columns ?? [];
+  return (
+    <section style={{ padding: "0 0 28px" }}>
+      <h3>专栏管理 · Columns</h3>
+      {items.map((col: any) => (
+        <div className="member-row" key={col.id}>
+          <span className="dname" style={{ fontSize: 15 }}>{col.title}</span>
+          <span className="bio">{col.column_label} · {col.author}</span>
+          <Link className="btn small" to={`/columns/${col.slug}`} target="_blank">查看</Link>{" "}
+          <button className="btn small danger" onClick={async () => { if (confirm("删除该专栏？")) { await api(`/admin/columns/${col.id}`, { method: "DELETE" }); setTick((x) => x + 1); } }}>删除</button>
+        </div>
+      ))}
     </section>
   );
 }

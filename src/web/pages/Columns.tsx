@@ -1,6 +1,47 @@
 import { Link, useParams } from "react-router-dom";
 import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
+import { Md } from "../Md";
+import { api } from "../api";
+import { useMe } from "../App";
+import { Avatar } from "../Avatar";
+import { useState } from "react";
+
+function Comments({ targetId }: { targetId: number }) {
+  const { t, lang } = useLang();
+  const { me } = useMe();
+  const [tick, setTick] = useState(0);
+  const [text, setText] = useState("");
+  const { data } = useFetch<{ comments: any[] }>(`/columns/comments?target=${targetId}`, [tick, targetId]);
+  const [note, setNote] = useState<string | null>(null);
+  const items = data?.comments ?? [];
+  return (
+    <section style={{ maxWidth: 700, marginBottom: 60 }}>
+      <h3 style={{ margin: "40px 0 18px" }}>{lang === "zh" ? "讨论" : "Discussion"} · {items.filter((x) => x.status === "approved").length}</h3>
+      {items.map((cm: any) => (
+        <div key={cm.id} className={`comment${cm.status === "pending" ? " pending" : ""}`}>
+          <div className="who">
+            <Avatar name={cm.display_name} size={26} />
+            <b>{cm.display_name}</b>
+            <span className="dim">{cm.created_at.slice(0, 16)}{cm.status === "pending" ? (lang === "zh" ? " · 审核中，仅你可见" : " · pending, only visible to you") : ""}</span>
+          </div>
+          <div className="body">{cm.text}</div>
+        </div>
+      ))}
+      {me ? (
+        <form onSubmit={async (e) => { e.preventDefault(); if (!text.trim()) return;
+          setNote(null);
+          try { await api("/comments", { method: "POST", body: JSON.stringify({ target_type: "column", target_id: targetId, text }) }); setText(""); setNote(lang === "zh" ? "已提交，审核通过后公开。" : "Submitted — visible after review."); setTick((x) => x + 1); }
+          catch (e2: any) { setNote(String(e2.message)); } }}>
+          {note && <div className="notice" role="status">{note}</div>}
+          <label className="field"><span>{lang === "zh" ? "写下你的想法（支持 Markdown、KaTeX 公式、Mermaid 图）" : "Your thoughts (Markdown, KaTeX, Mermaid supported)"}</span>
+            <textarea rows={3} value={text} onChange={(e: any) => setText(e.target.value)} required /></label>
+          <button className="btn primary small">{lang === "zh" ? "发表评论" : "Comment"}</button>
+        </form>
+      ) : <p className="dim">{lang === "zh" ? "登录后参与讨论。" : "Sign in to join the discussion."}</p>}
+    </section>
+  );
+}
 
 export function Columns() {
   const { t } = useLang();
@@ -43,9 +84,10 @@ export function ColumnDetail() {
         <p className="byline"><b>{c.author}</b> · {c.author_title} · {c.published_at}</p>
       </div></div>
       <div className="wrap">
-        <article className="prose">
-          {c.text.split(/\n{2,}/).map((para: string, i: number) => <p key={i}>{para}</p>)}
-        </article>
+        <div className="prose" style={{ paddingBottom: 24 }}>
+          <Md text={c.text} />
+        </div>
+        <Comments targetId={c.id} />
       </div>
     </>
   );
