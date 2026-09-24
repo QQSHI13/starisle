@@ -22,7 +22,6 @@ app.use(secureHeaders({
     imgSrc: ["'self'", "data:", "blob:"],
     connectSrc: ["'self'", "https://cdn.jsdelivr.net"],
   },
-  permissionsPolicy: { camera: [], microphone: [], geolocation: [] },
   crossOriginResourcePolicy: false,
 }));
 const SESSION_DAYS = 30;
