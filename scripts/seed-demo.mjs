@@ -28,8 +28,9 @@ const admin = one("SELECT id FROM members WHERE role='admin' LIMIT 1").id;
 // a demo project by 林小满, approved, with everything
 q(`INSERT OR IGNORE INTO projects (slug, name, tagline, body, repo_url, domain_id, status, owner_id, created_at, updated_at, featured)
    VALUES ('campus-river-watch','校园河流观察站','用便宜的传感器 + 一个网页，让全班看到校门口那条河每天的变化',
-   '我们怀疑校门口的河水在雨后变得更浑浊。\n\n这个项目的计划：\n\n1. 用浊度传感器每天采样\n2. 数据传到这个网站，画成折线图\n3. 和环保课一起写一份给学校的报告\n\n**目前已经完成了 14 天采样**，数据在仓库里。'.replace(/\\n/g,'\n'),
+   '我们怀疑校门口的河水在雨后变得更浑浊。\n\n这个项目的计划：\n\n1. 用浊度传感器每天采样\n2. 数据传到这个网站，画成折线图\n3. 和环保课一起写一份给学校的报告\n\n**目前已经完成了 14 天采样**，数据在仓库里。',
    'https://github.com/NumberSky/Stellar-Crossroads','climate','approved',?, datetime('now','-9 days'), datetime('now','-2 days'), 1)`, xiaoman);
+q("UPDATE projects SET body = REPLACE(body, '\\n', char(10)) WHERE slug='campus-river-watch'");
 const proj = one("SELECT id FROM projects WHERE slug='campus-river-watch'").id;
 q(`INSERT OR IGNORE INTO project_members (project_id, member_id, role) VALUES (?,?, 'owner')`, proj, xiaoman);
 q(`INSERT OR IGNORE INTO project_members (project_id, member_id, role) VALUES (?,?, 'member')`, proj, yiheng);
