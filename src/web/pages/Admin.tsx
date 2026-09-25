@@ -46,7 +46,7 @@ export default function Admin() {
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button className="btn small primary" onClick={() => decide("/admin/applications", a.id, "approve")}>{t.approve}</button>{" "}
                   <Reject onOk={(reason) => decide("/admin/applications", a.id, "reject", reason)} label={t.reject} />{" "}
-                  <button className="btn small danger" onClick={async () => { if (confirm("删除这条申请记录？")) { await api(`/admin/applications/${a.id}`, { method: "DELETE" }); refresh(); } }}>删除</button>
+                  <DeleteBtn label="删除" title="删除申请记录" warn="仅删除这条申请记录，不影响对应成员账号。" onConfirm={async () => { await api(`/admin/applications/${a.id}`, { method: "DELETE" }); refresh(); }} />
                 </td>
               </tr>
             ))}
@@ -469,6 +469,21 @@ function AdminTools() {
       </form>
     </section>
   );
+}
+
+function DeleteBtn({ onConfirm, label, title, warn }: { onConfirm: () => void; label: string; title: string; warn?: string }) {
+  const { t } = useLang();
+  const [open, setOpen] = useState(false);
+  return (<>
+    <button className="btn small danger" onClick={() => setOpen(true)}>{label}</button>
+    <Modal open={open} onClose={() => setOpen(false)} title={title}>
+      {warn && <p style={{ fontSize: 14.5, color: "var(--ink-2)", marginTop: 0 }}>{warn}</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn small danger" onClick={() => { setOpen(false); onConfirm(); }}>{t.confirm_delete}</button>
+        <button className="btn small" onClick={() => setOpen(false)}>{t.cancel}</button>
+      </div>
+    </Modal>
+  </>);
 }
 
 function Reject({ onOk, label }: { onOk: (reason: string) => void; label: string }) {

@@ -244,7 +244,8 @@ function Deactivate() {
 
 function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
   const { t } = useLang();
-  const [f, setF] = useState({ display_name: me.display_name, bio: me.bio ?? "", website_url: (me as any).website_url ?? "" });
+  const initial = { display_name: me.display_name, bio: me.bio ?? "", website_url: (me as any).website_url ?? "" };
+  const [f, setF] = useState(initial);
   const [msg, setMsg] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -267,6 +268,7 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
         <span>公开我的真实姓名（{(me as any).is_minor ? "未成年人不可公开" : "默认不公开"}）· Make my real name public</span>
       </label>
       <button className="btn" type="submit">{t.save}</button>
+      <button className="btn" type="button" style={{ marginLeft: 8 }} onClick={() => { setF(initial); setMsg(false); }}>{t.cancel}</button>
     </form>
   );
 }

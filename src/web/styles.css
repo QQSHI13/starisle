@@ -432,3 +432,15 @@ header.site { box-shadow: 0 1px 0 var(--line); }
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
   .quick-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---------- activity feed ---------- */
+.feed-list { border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.feed-item { display: flex; gap: 12px; align-items: baseline; padding: 13px 18px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.feed-item:last-child { border-bottom: 0; }
+.feed-item > svg.lucide { color: var(--gold); align-self: center; flex: none; }
+.feed-body { flex: 1; min-width: 0; }
+.feed-body b { font-weight: 600; }
+.feed-subject { color: var(--gold); font-weight: 600; }
+.feed-subject:hover { text-decoration: underline; text-underline-offset: 2px; }
+.feed-text { display: block; color: var(--ink-3); font-size: 13px; margin-top: 3px; overflow-wrap: break-word; }
+.feed-time { white-space: nowrap; color: var(--ink-3); font-size: 12px; flex: none; }

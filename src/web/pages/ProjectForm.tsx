@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLang } from "../i18n";
 import { api } from "../api";
 import { useFetch } from "../hooks";
+import { Modal } from "../Modal";
 
 export function ProjectForm({ existing, onDone }: { existing?: any; onDone: () => void }) {
   const { t } = useLang();
@@ -10,6 +11,7 @@ export function ProjectForm({ existing, onDone }: { existing?: any; onDone: () =
     repo_url: existing?.repo_url ?? "", demo_url: existing?.demo_url ?? "", poster_url: existing?.poster_url ?? "", domain_id: existing?.domain_id ?? "",
   });
   const [err, setErr] = useState<string | null>(null);
+  const [delOpen, setDelOpen] = useState(false);
   const { data: domData } = useFetch<{ domains: any[] }>("/domains");
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setErr(null);
@@ -20,9 +22,9 @@ export function ProjectForm({ existing, onDone }: { existing?: any; onDone: () =
     } catch (e: any) { setErr(String(e.message)); }
   };
   const del = async () => {
-    if (!existing || !confirm("Delete this project?")) return;
-    try { await api(`/my/projects/${existing.slug}`, { method: "DELETE" }); onDone(); }
-    catch (e: any) { setErr(String(e.message)); }
+    if (!existing) return;
+    try { await api(`/my/projects/${existing.slug}`, { method: "DELETE" }); setDelOpen(false); onDone(); }
+    catch (e: any) { setErr(String(e.message)); setDelOpen(false); }
   };
   return (
     <form onSubmit={submit} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 20, margin: "14px 0" }}>
@@ -47,7 +49,15 @@ export function ProjectForm({ existing, onDone }: { existing?: any; onDone: () =
           {(domData?.domains ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select></label>
       <button className="btn primary" type="submit">{t.save}</button>
-      {existing && <button className="btn danger" type="button" style={{ marginLeft: 8 }} onClick={del}>{t.delete}</button>}
+      <button className="btn" type="button" style={{ marginLeft: 8 }} onClick={onDone}>{t.cancel}</button>
+      {existing && <button className="btn danger" type="button" style={{ marginLeft: 8 }} onClick={() => setDelOpen(true)}>{t.delete}</button>}
+      <Modal open={delOpen} onClose={() => setDelOpen(false)} title={t.delete}>
+        <p style={{ fontSize: 14.5, color: "var(--ink-2)", marginTop: 0 }}>{t.delete_project_warn}</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn small danger" onClick={del}>{t.confirm_delete}</button>
+          <button className="btn small" onClick={() => setDelOpen(false)}>{t.cancel}</button>
+        </div>
+      </Modal>
     </form>
   );
 }

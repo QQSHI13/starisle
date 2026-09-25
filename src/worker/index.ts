@@ -748,7 +748,36 @@ app.get("/api/my/dashboard", async (c) => {
      JOIN project_updates u ON u.project_id = f.project_id AND u.status = 'approved'
      JOIN projects p ON p.id = f.project_id JOIN members m ON m.id = u.author_id
      WHERE f.member_id = ? ORDER BY u.created_at DESC LIMIT 6`).bind(m.id).all()).results;
-  return c.json({ projects, notifications, homework, join_requests, followed_updates });
+  const feed = (await c.env.DB.prepare(
+    `SELECT * FROM (
+       SELECT 'update' AS kind, u.created_at AS at, a.display_name AS actor, p.name AS subject, p.slug AS slug, u.text AS text
+       FROM project_follows f
+       JOIN project_updates u ON u.project_id = f.project_id AND u.status = 'approved'
+       JOIN projects p ON p.id = f.project_id JOIN members a ON a.id = u.author_id
+       WHERE f.member_id = ?
+       UNION ALL
+       SELECT 'update', u.created_at, a.display_name, p.name, p.slug, u.text
+       FROM member_follows mf
+       JOIN project_updates u ON u.author_id = mf.followee_id AND u.status = 'approved'
+       JOIN projects p ON p.id = u.project_id JOIN members a ON a.id = u.author_id
+       WHERE mf.follower_id = ?
+       UNION ALL
+       SELECT 'project', p.created_at, a.display_name, p.name, p.slug, p.tagline
+       FROM member_follows mf
+       JOIN projects p ON p.owner_id = mf.followee_id AND p.status = 'approved'
+       JOIN members a ON a.id = mf.followee_id
+       WHERE mf.follower_id = ?
+       UNION ALL
+       SELECT 'update', u.created_at, a.display_name, p.name, p.slug, u.text
+       FROM project_updates u
+       JOIN projects p ON p.id = u.project_id JOIN members a ON a.id = u.author_id
+       WHERE u.author_id = ? AND u.status = 'approved'
+       UNION ALL
+       SELECT 'project', p.created_at, a.display_name, p.name, p.slug, p.tagline
+       FROM projects p JOIN members a ON a.id = p.owner_id
+       WHERE p.owner_id = ? AND p.status = 'approved'
+     ) ORDER BY at DESC LIMIT 20`).bind(m.id, m.id, m.id, m.id, m.id).all()).results;
+  return c.json({ projects, notifications, homework, join_requests, followed_updates, feed });
 });
 
 // ---------- DM (allowed only if at least one side is teacher/admin) ----------

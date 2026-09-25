@@ -100,10 +100,21 @@ function CommandCenter() {
         ))}
       </div>
     </div></section>
-    {dash.followed_updates.length > 0 && section("trend", zh ? "关注项目的最新动态" : "Followed projects", (
-      <div className="grid">{dash.followed_updates.map((u: any, i: number) => (
-        <Link className="card" key={i} to={`/projects/${u.slug}`}><span className="pill">{u.name}</span><p className="tagline" style={{ color: "var(--ink)" }}>{u.text}</p><div className="meta"><span>{u.author}</span><span>{u.created_at.slice(0, 16)}</span></div></Link>
-      ))}</div>
+    {(dash.feed ?? []).length > 0 && section("trend", zh ? "动态" : "Your feed", (
+      <div className="feed-list">
+        {dash.feed.map((f: any, i: number) => (
+          <div className="feed-item" key={i}>
+            <I name={f.kind === "project" ? "folder" : "trend"} size={15} />
+            <span className="feed-body">
+              <b>{f.actor}</b>{" "}
+              {f.kind === "project" ? (zh ? "发起了项目" : "started") : (zh ? "发布了进展" : "posted an update")}{" "}
+              <Link to={`/projects/${f.slug}`} className="feed-subject">{f.subject}</Link>
+              {f.text ? <span className="feed-text">{f.text.length > 120 ? f.text.slice(0, 120) + "…" : f.text}</span> : null}
+            </span>
+            <span className="feed-time">{String(f.at).slice(0, 16)}</span>
+          </div>
+        ))}
+      </div>
     ))}
     {section("folder", t.my_projects, dash.projects.length === 0 ? (
       <div className="empty"><b>{zh ? "还没有项目" : "No projects yet"}</b>{zh ? "去项目广场看看同龄人在做什么，或从个人中心发起第一个项目。" : "Browse what others are building, or start your first project from your account page."}<br /><Link className="btn small" style={{ marginTop: 14 }} to="/projects">{zh ? "浏览项目" : "Browse projects"} →</Link></div>

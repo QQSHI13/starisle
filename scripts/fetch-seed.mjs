@@ -1,6 +1,6 @@
 // Pulls the real public data from the live starisle site and generates src/db/seed-data.sql.
 // Password hashes are left as a placeholder (see scripts/hash-passwords.mjs).
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readdirSync } from "node:fs";
 
 const BASE = "https://forum.aiyf.org.cn/api";
 const OUT = new URL("../src/db/seed-data.sql", import.meta.url).pathname;
@@ -129,6 +129,17 @@ for (const p of partners) {
     } catch { logo = null; }
   }
   L.push(`INSERT INTO partners (id,slug,name,category,website,logo_url,monogram) VALUES (${p.id},${esc(p.slug)},${esc(p.name)},${esc(p.category)},${esc(p.website)},${esc(logo)},${esc(p.monogram ?? "")}) ON CONFLICT(id) DO UPDATE SET logo_url=excluded.logo_url, website=excluded.website;`);
+}
+
+// The legacy API no longer returns poster data on every harvest. Re-attach any
+// poster image already sitting in public/posters to its project (file named <slug>.<ext>),
+// so previously harvested posters survive seed regeneration.
+const posterDir = new URL("../public/posters", import.meta.url).pathname;
+const slugs = new Set([...details.map((d) => (d.project ?? d).slug)]);
+for (const file of readdirSync(posterDir)) {
+  const m = file.match(/^(.+)\.(jpg|jpeg|png|webp|gif)$/i);
+  if (m && slugs.has(m[1]))
+    L.push(`UPDATE projects SET poster_url = ${esc(`/posters/${file}`)} WHERE slug = ${esc(m[1])};`);
 }
 
 writeFileSync(OUT, L.join("\n") + "\n");

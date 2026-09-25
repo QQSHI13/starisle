@@ -217,3 +217,5 @@ INSERT INTO partners (id,slug,name,category,website,logo_url,monogram) VALUES (3
 INSERT INTO partners (id,slug,name,category,website,logo_url,monogram) VALUES (31,'o-ac8660','北京市通州区潞河中学','中学','https://www.luhe.cn/','/partners/31.png','潞河') ON CONFLICT(id) DO UPDATE SET logo_url=excluded.logo_url, website=excluded.website;
 INSERT INTO partners (id,slug,name,category,website,logo_url,monogram) VALUES (32,'o-59508c','北京市正泽学校','中学','http://www.bjzzschool.com/','/partners/32.png','正泽') ON CONFLICT(id) DO UPDATE SET logo_url=excluded.logo_url, website=excluded.website;
 INSERT INTO partners (id,slug,name,category,website,logo_url,monogram) VALUES (33,'o-224c25','清华大学附属中学永丰学校','中学','https://www.qhfzyf.cn/cms/','/partners/33.png','永丰') ON CONFLICT(id) DO UPDATE SET logo_url=excluded.logo_url, website=excluded.website;
+UPDATE projects SET poster_url = '/posters/3d.jpg' WHERE slug = '3d';
+UPDATE projects SET poster_url = '/posters/p-2c3879.jpg' WHERE slug = 'p-2c3879';
