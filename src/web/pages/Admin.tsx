@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { MdToolbar } from "../MdToolbar";
+import { Editor } from "../Editor";
 import { I } from "../icons";
+import { Modal } from "../Modal";
+import { useToast } from "../toast";
 import { Md } from "../Md";
 import { useLang } from "../i18n";
 import { api } from "../api";
@@ -204,10 +206,7 @@ function MembersAdmin() {
               </td>
               <td style={{ whiteSpace: "nowrap" }}>
                 <button className="btn small" onClick={() => verify(m.id)}>{m.verified ? "取消认证" : "认证"}</button>{" "}
-                <button className="btn small" onClick={async () => {
-                  const role = prompt("设置角色：member / teacher / admin", m.role);
-                  if (role && ["member","teacher","admin"].includes(role)) { await api(`/admin/members/${m.id}/role`, { method: "POST", body: JSON.stringify({ role }) }); setTick((x) => x + 1); }
-                }}>{m.role === "admin" ? "管理" : m.role === "teacher" ? "导师" : "成员"}</button>{" "}
+                <RoleModal m={m} onSaved={() => setTick((x) => x + 1)} />{" "}
                 <button className="btn small danger" onClick={async () => { await api(`/admin/members/${m.id}/status`, { method: "POST", body: JSON.stringify({ status: m.status === "active" ? "deactivated" : "active" }) }); setTick((x) => x + 1); }}>{m.status === "active" ? "停用" : "启用"}</button>
               </td>
             </tr>
@@ -251,7 +250,7 @@ function ColumnsAdmin() {
           <span className="bio">{col.column_label} · {col.author}</span>
           <Link className="btn small" to={`/columns/${col.slug}`} target="_blank">查看</Link>{" "}
           <ColumnEditor id={col.id} title={col.title} subtitle={col.subtitle ?? ""} existing={{ title: col.title, subtitle: col.subtitle ?? "", slug: col.slug }} onSaved={() => setTick((x) => x + 1)} />
-          <button className="btn small danger" onClick={async () => { if (confirm("删除该专栏？")) { await api(`/admin/columns/${col.id}`, { method: "DELETE" }); setTick((x) => x + 1); } }}>删除</button>
+          <button className="btn small danger" onClick={async () => { { await api(`/admin/columns/${col.id}`, { method: "DELETE" }); setTick((x) => x + 1); } }}>删除</button>
         </div>
       ))}
     </section>
@@ -277,8 +276,7 @@ function ColumnEditor({ id, onSaved, existing }: { id: number; title: string; su
       {open && (
         <div style={{ width: "100%", marginTop: 10, border: "1px solid var(--line)", borderRadius: 8, padding: 16 }}>
           {loading ? <p className="dim">载入中…</p> : (<>
-            <MdToolbar value={text} onChange={setText} rows={8} />
-            <details style={{ margin: "10px 0" }}><summary className="dim" style={{ cursor: "pointer", fontSize: 13 }}>预览</summary><Md text={text} /></details>
+            <Editor value={text} onChange={setText} rows={10} />
             <button className="btn small primary" onClick={async () => {
               await api(`/admin/columns/${id}`, { method: "PUT", body: JSON.stringify({ text }) });
               onSaved(); setOpen(false);
@@ -370,7 +368,7 @@ function LessonList({ slug }: { slug: string }) {
         <div className="member-row" key={l.id}>
           <span className="pill">#{l.id}</span>
           <span className="bio" style={{ flex: 1 }}>{l.title}{l.summary ? ` — ${l.summary}` : ""}</span>
-          <button className="btn small danger" onClick={async () => { if (confirm("删除该课节及其作业？")) { await api(`/admin/lessons/${l.id}`, { method: "DELETE" }); location.reload(); } }}>删除</button>
+          <button className="btn small danger" onClick={async () => { { await api(`/admin/lessons/${l.id}`, { method: "DELETE" }); location.reload(); } }}>删除</button>
         </div>
       ))}
     </div>
@@ -381,10 +379,12 @@ function GradingQueue() {
   const [tick, setTick] = useState(0);
   const { data } = useFetch<{ submissions: any[] }>("/admin/submissions", [tick]);
   const items = (data?.submissions ?? []).filter((s: any) => s.status === "pending");
-  const grade = async (id: number, action: string) => {
-    const feedback = prompt(action === "approve" ? "评语（选填）" : "修改建议（会通知学生）") ?? "";
-    await api(`/admin/submissions/${id}`, { method: "POST", body: JSON.stringify({ action, feedback }) });
-    setTick((x) => x + 1);
+  const [grade, setGrade] = useState<{ id: number; action: string } | null>(null);
+  const [feedback, setFeedback] = useState("");
+  const doGrade = async () => {
+    if (!grade) return;
+    await api(`/admin/submissions/${grade.id}`, { method: "POST", body: JSON.stringify({ action: grade.action, feedback }) });
+    setGrade(null); setFeedback(""); setTick((x) => x + 1);
   };
   if (items.length === 0) return null;
   return (
@@ -395,10 +395,15 @@ function GradingQueue() {
           <span className="dname" style={{ fontSize: 15 }}>{s.display_name}{s.username ? `(${s.username})` : ""}</span>
           <span className="bio" style={{ flex: 1 }}>{s.course_title} · {s.homework_title}</span>
           <a className="btn small" href={s.repo_url} target="_blank" rel="noreferrer">查看</a>{" "}
-          <button className="btn small primary" onClick={() => grade(s.id, "approve")}>通过</button>{" "}
-          <button className="btn small danger" onClick={() => grade(s.id, "reject")}>打回</button>
+          <button className="btn small primary" onClick={() => { setFeedback(""); setGrade({ id: s.id, action: "approve" }); }}>通过</button>{" "}
+          <button className="btn small danger" onClick={() => { setFeedback(""); setGrade({ id: s.id, action: "reject" }); }}>打回</button>
         </div>
       ))}
+      <Modal open={!!grade} onClose={() => setGrade(null)} title={grade?.action === "approve" ? "通过 · 评语（选填）" : "打回 · 修改建议"}>
+        <label className="field"><span>反馈（会通知学生）</span>
+          <textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} autoFocus /></label>
+        <button className="btn small primary" onClick={doGrade}>提交</button>
+      </Modal>
     </section>
   );
 }
@@ -449,8 +454,7 @@ function AdminTools() {
         <b>发布专栏</b>
         <div style={{ marginTop: 8, maxWidth: 560 }}>
           <input type="text" placeholder="标题" value={cTitle} onChange={(e: any) => setCTitle(e.target.value)} required style={{ marginBottom: 8 }} />
-          <MdToolbar value={cText} onChange={setCText} rows={4} placeholder="正文（支持 Markdown、KaTeX、Mermaid）" />
-          {cText && <details style={{ margin: "10px 0" }}><summary className="dim" style={{ cursor: "pointer", fontSize: 13 }}>预览</summary><Md text={cText} /></details>}
+          <Editor value={cText} onChange={setCText} rows={8} />
           <button className="btn small primary" style={{ marginTop: 8 }}>发布</button>
         </div>
       </form>
@@ -476,11 +480,27 @@ function Reject({ onOk, label }: { onOk: (reason: string) => void; label: string
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  if (!open) return <button className="btn small danger" onClick={() => setOpen(true)}>{label}</button>;
-  return (
-    <span style={{ display: "inline-flex", gap: 6, marginLeft: 6 }}>
-      <input type="text" placeholder={t.reason} value={reason} onChange={(e) => setReason(e.target.value)} style={{ width: 180 }} />
-      <button className="btn small danger" onClick={() => { onOk(reason); setOpen(false); }}>OK</button>
-    </span>
-  );
+  return (<>
+    <button className="btn small danger" onClick={() => setOpen(true)}>{label}</button>
+    <Modal open={open} onClose={() => setOpen(false)} title={t.reason}>
+      <label className="field"><span>{t.reason}</span>
+        <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus /></label>
+      <button className="btn small danger" onClick={() => { onOk(reason || "未说明原因"); setOpen(false); setReason(""); }}>确认拒绝</button>
+    </Modal>
+  </>);
+}
+
+function RoleModal({ m, onSaved }: { m: any; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [role, setRole] = useState(m.role);
+  return (<>
+    <button className="btn small" onClick={() => { setRole(m.role); setOpen(true); }}>{m.role === "admin" ? "管理" : m.role === "teacher" ? "导师" : "成员"}</button>
+    <Modal open={open} onClose={() => setOpen(false)} title={`设置角色 · ${m.display_name}`}>
+      <label className="field"><span>角色</span>
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="member">成员 member</option><option value="teacher">导师 teacher</option><option value="admin">管理员 admin</option>
+        </select></label>
+      <button className="btn small primary" onClick={async () => { await api(`/admin/members/${m.id}/role`, { method: "POST", body: JSON.stringify({ role }) }); setOpen(false); onSaved(); }}>保存</button>
+    </Modal>
+  </>);
 }

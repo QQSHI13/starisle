@@ -10,7 +10,8 @@ import { useMe } from "../App";
 import { ProjectForm } from "./ProjectForm";
 import { Md } from "../Md";
 import { useToast } from "../toast";
-import { MdToolbar } from "../MdToolbar";
+import { Editor } from "../Editor";
+import { Modal } from "../Modal";
 
 export function Projects() {
   const { t, lang } = useLang();
@@ -52,6 +53,26 @@ export function Projects() {
               </div></section>
     </>
   );
+}
+
+function ReportModal({ targetId }: { targetId: number }) {
+  const { lang } = useLang();
+  const { me } = useMe();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  return (<>
+    <button className="btn small danger" style={{ width: "100%", marginTop: 8 }} onClick={() => { if (!me) { location.href = "/login"; return; } setOpen(true); }}>
+      {lang === "zh" ? "举报此项目" : "Report"}</button>
+    <Modal open={open} onClose={() => setOpen(false)} title={lang === "zh" ? "举报此项目" : "Report project"}>
+      <label className="field"><span>{lang === "zh" ? "原因（选填）" : "Reason (optional)"}</span>
+        <textarea rows={3} value={reason} onChange={(e: any) => setReason(e.target.value)} autoFocus /></label>
+      <button className="btn small danger" onClick={async () => {
+        await api("/reports", { method: "POST", body: JSON.stringify({ target_type: "project", target_id: targetId, reason }) });
+        toast(lang === "zh" ? "已提交举报，管理员会尽快处理" : "Report submitted"); setOpen(false); setReason("");
+      }}>{lang === "zh" ? "提交举报" : "Submit"}</button>
+    </Modal>
+  </>);
 }
 
 export function ProjectDetail() {
@@ -151,7 +172,7 @@ export function ProjectDetail() {
                 await api(`/projects/${slug}/updates`, { method: "POST", body: JSON.stringify({ text: msg }) });
                 setMsg(""); location.reload(); }}>
                 <label className="field"><span>{lang === "zh" ? "发布进展" : "Post an update"}</span>
-                  <MdToolbar value={msg} onChange={setMsg} rows={2} /></label>
+                  <Editor value={msg} onChange={setMsg} rows={2} preview={false} /></label>
                 <button className="btn small primary">{lang === "zh" ? "发布" : "Post"}</button>
               </form>
             ) : (

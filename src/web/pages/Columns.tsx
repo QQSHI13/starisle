@@ -4,7 +4,7 @@ import { useFetch } from "../hooks";
 import { Md } from "../Md";
 import { api } from "../api";
 import { useToast } from "../toast";
-import { MdToolbar } from "../MdToolbar";
+import { Editor } from "../Editor";
 import { useMe } from "../App";
 import { Avatar } from "../Avatar";
 import { useState } from "react";
@@ -38,7 +38,7 @@ function Comments({ targetId }: { targetId: number }) {
           catch (e2: any) { setNote(String(e2.message)); } }}>
           {note && <div className="notice" role="status">{note}</div>}
           <label className="field"><span>{lang === "zh" ? "写下你的想法（支持 Markdown、KaTeX 公式、Mermaid 图）" : "Your thoughts (Markdown, KaTeX, Mermaid supported)"}</span>
-            <MdToolbar value={text} onChange={setText} rows={3} /></label>
+            <Editor value={text} onChange={setText} rows={3} preview={false} /></label>
           <button className="btn primary small">{lang === "zh" ? "发表评论" : "Comment"}</button>
         </form>
       ) : <p className="dim">{lang === "zh" ? "登录后参与讨论。" : "Sign in to join the discussion."}</p>}

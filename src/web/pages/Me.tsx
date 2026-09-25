@@ -5,6 +5,8 @@ import { api } from "../api";
 import { useMe } from "../App";
 import { useFetch } from "../hooks";
 import { ProjectForm } from "./ProjectForm";
+import { Modal } from "../Modal";
+
 import { Avatar } from "../Avatar";
 
 export default function Me() {
@@ -67,6 +69,10 @@ export default function Me() {
         ))}
       </section>
 
+      <section style={{ padding: "0 0 36px" }}>
+        <div className="block-head"><h2>私信</h2><Link className="btn small" to="/dm">打开私信页 →</Link></div>
+        <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}><MiniDM /></div>
+      </section>
       <HomeworkInbox />
       <JoinInbox />
       <ProfileForm me={me} onSaved={refresh} />
@@ -199,6 +205,19 @@ function useJ() {
   const [tick, setTick] = useState(0);
   const res = useFetch<{ requests: any[] }>("/my/join-requests", [tick]);
   return { data: res.data, refresh: () => setTick((x) => x + 1) };
+}
+
+function MiniDM() {
+  const [convs, setConvs] = useState<any[]>([]);
+  useEffect(() => { api("/dm").then((d) => setConvs(d.conversations.slice(0, 4))).catch(() => {}); }, []);
+  if (convs.length === 0) return <p className="dim" style={{ padding: "14px 16px", margin: 0, fontSize: 13.5 }}>暂无会话。</p>;
+  return (<>{convs.map((cv) => (
+    <Link to={`/dm?with=${cv.id}`} key={cv.id} className="member-row" style={{ textDecoration: "none" }}>
+      <span className="dname" style={{ fontSize: 15 }}>{cv.display_name}{cv.role !== "member" && <span className="pill gold" style={{ marginLeft: 6 }}>{cv.role === "admin" ? "管理" : "导师"}</span>}</span>
+      <span className="bio" style={{ flex: 1 }}>{cv.last_text}</span>
+      {cv.unread > 0 && <span className="pill gold">{cv.unread}</span>}
+    </Link>
+  ))}</>);
 }
 
 function Deactivate() {
