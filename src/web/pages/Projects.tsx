@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
@@ -7,6 +7,7 @@ import { I } from "../icons";
 import { Avatar } from "../Avatar";
 import { api } from "../api";
 import { useMe } from "../App";
+import { useHighlight } from "../hl";
 import { ProjectForm } from "./ProjectForm";
 import { Md } from "../Md";
 import { useToast } from "../toast";
@@ -85,13 +86,18 @@ export function ProjectDetail() {
   const editing = sp.get("edit") === "1";
   const [msg, setMsg] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const hlq = sp.get("hl") ?? "";
+  const headRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useHighlight(headRef, hlq, [data]);
+  useHighlight(bodyRef, hlq, [data]);
   if (error) return <div className="err-full">{error}</div>;
   if (!data) return <div className="loading">{t.loading}</div>;
   const p = data.project;
   const rs = data.repo_stats;
   return (
     <>
-      <div className="page-head"><div className="wrap">
+      <div className="page-head"><div className="wrap" ref={headRef}>
         <p className="kicker">{p.domain_name ?? t.nav_projects}</p>
         <h1 style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
           {p.name}
@@ -107,7 +113,7 @@ export function ProjectDetail() {
           <ProjectForm existing={p} onDone={() => location.assign(`/projects/${p.slug}`)} />
         </div></section>
       )}
-      <section className="block"><div className="wrap"><div className="detail-grid"><div>
+      <section className="block"><div className="wrap"><div className="detail-grid"><div ref={bodyRef}>
         {data.stack.length > 0 && (
           <p>{data.stack.map((s) => <span key={s} className="pill" style={{ marginRight: 8 }}>{s}</span>)}</p>
         )}

@@ -103,7 +103,7 @@ export default function Search() {
                   <div className="member-row" key={hit.ref}>
                     {kind === "member" && <Avatar name={payload?.docs.find((d) => d.ref === hit.ref)?.title ?? "?"} size={26} />}
                     <span className="dname" style={{ fontSize: 16 }}>
-                      {m.href ? <Link to={m.href}>{payload?.docs.find((d) => d.ref === hit.ref)?.title || m.sub}</Link> : payload?.docs.find((d) => d.ref === hit.ref)?.title}
+                      {m.href ? <Link to={{ pathname: m.href, search: q ? `?hl=${encodeURIComponent(q)}` : "" }}>{payload?.docs.find((d) => d.ref === hit.ref)?.title || m.sub}</Link> : payload?.docs.find((d) => d.ref === hit.ref)?.title}
                     </span>
                     <span className="bio"><Hi text={m.sub || payload?.docs.find((d) => d.ref === hit.ref)?.text} q={q} /></span>
                     <span className="pill" style={{ marginLeft: "auto" }}>{Math.round(hit.score)}</span>

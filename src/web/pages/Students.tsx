@@ -1,10 +1,11 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
 import { Avatar } from "../Avatar";
 import { api } from "../api";
 import { useMe } from "../App";
-import { useState } from "react";
+import { useHighlight } from "../hl";
+import { useRef, useState } from "react";
 import { I } from "../icons";
 
 export function Students() {
@@ -45,12 +46,15 @@ export function Profile() {
   const [following, setFollowing] = useState(false);
   const { t } = useLang();
   const { data, error } = useFetch<{ member: any; projects: any[] }>(`/members/${encodeURIComponent(username!)}`, [username]);
+  const [sp] = useSearchParams();
+  const hlRef = useRef<HTMLDivElement>(null);
+  useHighlight(hlRef, sp.get("hl") ?? "", [data]);
   if (error) return <div className="err-full">{error}</div>;
   if (!data) return <div className="loading">{t.loading}</div>;
   const m = data.member;
   return (
     <>
-      <div className="page-head"><div className="wrap">
+      <div className="page-head"><div className="wrap" ref={hlRef}>
         <p className="kicker">@{m.username}</p>
         <div className="profile-head">
           <Avatar name={m.display_name || m.username} src={m.avatar} size={76} />

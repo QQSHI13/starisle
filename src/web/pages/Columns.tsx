@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
 import { Md } from "../Md";
@@ -8,7 +8,8 @@ import { Editor } from "../Editor";
 import { useMe } from "../App";
 import { Avatar } from "../Avatar";
 import { I } from "../icons";
-import { useState } from "react";
+import { useHighlight } from "../hl";
+import { useRef, useState } from "react";
 
 function Comments({ targetId }: { targetId: number }) {
   const { t, lang } = useLang();
@@ -78,6 +79,9 @@ export function ColumnDetail() {
   const { slug } = useParams();
   const { t } = useLang();
   const { data } = useFetch<{ column: any }>(`/columns/${slug}`, [slug]);
+  const [sp] = useSearchParams();
+  const hlRef = useRef<HTMLDivElement>(null);
+  useHighlight(hlRef, sp.get("hl") ?? "", [data]);
   if (!data) return <div className="loading">{t.loading}</div>;
   const c = data.column;
   return (
@@ -88,7 +92,7 @@ export function ColumnDetail() {
         {c.subtitle && <p className="sub">{c.subtitle}</p>}
         <p className="byline"><b>{c.author}</b> · {c.author_title} · {c.published_at}</p>
       </div></div>
-      <div className="wrap">
+      <div className="wrap" ref={hlRef}>
         <div className="prose" style={{ paddingBottom: 24 }}>
           <Md text={c.text} />
         </div>
