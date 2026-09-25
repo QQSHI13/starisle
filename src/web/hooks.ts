@@ -33,3 +33,13 @@ export function timeAgo(iso: string, lang: string): string {
   if (s < 86400 * 30) return zh ? `${Math.floor(s / 86400)} 天前` : `${Math.floor(s / 86400)}d ago`;
   return iso.slice(0, 10);
 }
+
+export function useReveal() {
+  useEffect(() => {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    }, { threshold: 0.08 });
+    document.querySelectorAll(".reveal:not(.in)").forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  });
+}

@@ -127,6 +127,8 @@ export function LangProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = next === "zh" ? "zh-CN" : "en";
   };
   const toggleTheme = () => {
+    document.documentElement.classList.add("theme-anim");
+    setTimeout(() => document.documentElement.classList.remove("theme-anim"), 300);
     const next = theme === "light" ? "dark" : "light";
     localStorage.setItem("theme", next);
     setTheme(next);

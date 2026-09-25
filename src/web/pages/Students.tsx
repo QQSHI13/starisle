@@ -51,16 +51,26 @@ export function Profile() {
     <>
       <div className="page-head"><div className="wrap">
         <p className="kicker">@{m.username}</p>
-        <h1 style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Avatar name={m.display_name || m.username} src={m.avatar} size={52} /> {m.display_name}
+        <div className="profile-head">
+          <Avatar name={m.display_name || m.username} src={m.avatar} size={76} />
+          <div>
+            <h1 style={{ display: "flex", alignItems: "center", gap: 14, margin: 0 }}>
+              {m.display_name}
           {me && me.username !== m.username && (
             <button className="btn small" onClick={async () => {
               await api(`/members/${encodeURIComponent(m.username)}/follow`, { method: following ? "DELETE" : "POST" });
               setFollowing(!following);
             }}>{following ? "已关注 ✓" : "关注"}</button>
           )}
-        </h1>
-        {m.bio && <p className="sub">{m.bio}</p>}
+            </h1>
+            <div className="profile-stats">
+              <div><b>{data.projects.length}</b><span>参与项目</span></div>
+              <div><b>{(m.created_at ?? "—").slice(0, 10)}</b><span>加入时间</span></div>
+              <div><b>{m.verified ? "已认证" : "成员"}</b><span>状态</span></div>
+            </div>
+          </div>
+        </div>
+        {m.bio && <p className="sub" style={{ marginTop: 18 }}>{m.bio}</p>}
         <p style={{ marginTop: 10 }}>
           {data.projects.length > 0 && <span className="pill gold">项目成员</span>}{" "}
           {data.projects.length >= 2 && <span className="pill gold">多项目玩家</span>}{" "}

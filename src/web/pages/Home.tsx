@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useLang } from "../i18n";
-import { useFetch, timeAgo } from "../hooks";
+import { useFetch, timeAgo, useReveal } from "../hooks";
 import { I } from "../icons";
 
 type Project = {
@@ -35,6 +35,7 @@ export default function Home() {
   const { data: colData } = useFetch<{ columns: any[] }>("/columns");
   const { data: feed } = useFetch<{ updates: any[]; projects: any[]; events: any[] }>("/feed");
   const featured = proj?.projects?.slice(0, 4) ?? [];
+  useReveal();
   const statItems = [
     [stats?.members, t.stat_members], [stats?.projects, t.stat_projects],
     [stats?.courses, t.stat_courses], [stats?.activities, t.stat_activities],
@@ -70,7 +71,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="block">
+      <section className="block reveal">
         <div className="wrap">
           <div className="block-head">
             <h2><span className="sec-num">01</span>{t.featured}</h2>
@@ -82,7 +83,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="block">
+      <section className="block reveal">
         <div className="wrap">
           <div className="block-head">
             <h2><span className="sec-num">02</span>{t.courses_title}</h2>
@@ -103,7 +104,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="block">
+      <section className="block reveal">
         <div className="wrap">
           <div className="block-head"><h2><span className="sec-num">03</span>{lang === "zh" ? "社区动态" : "Community pulse"}</h2></div>
           <div className="grid">
@@ -125,7 +126,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="block">
+      <section className="block reveal">
         <div className="wrap">
           <div className="block-head">
             <h2><span className="sec-num">04</span>{t.columns_title}</h2>

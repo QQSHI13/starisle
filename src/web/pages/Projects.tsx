@@ -85,7 +85,7 @@ export function ProjectDetail() {
           <ProjectForm existing={p} onDone={() => location.assign(`/projects/${p.slug}`)} />
         </div></section>
       )}
-      <section className="block"><div className="wrap">
+      <section className="block"><div className="wrap"><div className="detail-grid"><div>
         {data.stack.length > 0 && (
           <p>{data.stack.map((s) => <span key={s} className="pill" style={{ marginRight: 8 }}>{s}</span>)}</p>
         )}
@@ -184,7 +184,29 @@ export function ProjectDetail() {
           </>
         )}
         {p.body && <div className="prose" style={{ padding: "24px 0" }}><Md text={p.body.replace(/\\n/g, "\n")} /></div>}
-      </div></section>
+      </div>
+      <aside className="aside-card">
+        <h4>项目概览</h4>
+        <div className="stat-row"><span>{t.owner}</span><b style={{fontSize:14}}>{p.owner_display}{p.owner_username ? `（${p.owner_username}）` : ""}</b></div>
+        <div className="stat-row"><span>{t.contributors}</span><b>{data.members.length}</b></div>
+        <div className="stat-row"><span>{lang === "zh" ? "关注者" : "Followers"}</span><b>{data.followers}</b></div>
+        <div className="stat-row"><span>{t.repo}</span><b style={{fontSize:13, wordBreak:"break-all"}}>{rs && !rs.error ? `${rs.stars} ★ / ${rs.forks} ⑂` : "—"}</b></div>
+        {p.repo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:14}} href={p.repo_url} target="_blank" rel="noreferrer">{lang === "zh" ? "查看开源仓库" : "View repository"} →</a>}
+        {p.demo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:8}} href={p.demo_url} target="_blank" rel="noreferrer">{t.demo} →</a>}
+        {me && me.username !== p.owner_username && (
+          <button className="btn small primary" style={{width:"100%", marginTop:8}} onClick={async () => {
+            await api(`/projects/${slug}/follow`, { method: data.following ? "DELETE" : "POST" });
+            toast(data.following ? "已取消关注" : "已关注"); setTimeout(() => location.reload(), 600);
+          }}>{data.following ? (lang === "zh" ? "已关注 ✓" : "Following ✓") : (lang === "zh" ? "关注这个项目" : "Follow")}</button>
+        )}
+        <button className="btn small danger" style={{width:"100%", marginTop:8}} onClick={async () => {
+          if (!me) { location.href = "/login"; return; }
+          const reason = prompt(lang === "zh" ? "举报原因（选填）" : "Reason (optional)") ?? "";
+          await api("/reports", { method: "POST", body: JSON.stringify({ target_type: "project", target_id: data.project.id, reason }) });
+          toast(lang === "zh" ? "已提交举报" : "Report submitted");
+        }}>{lang === "zh" ? "举报此项目" : "Report"}</button>
+      </aside>
+      </div></div></section>
     </>
   );
 }
