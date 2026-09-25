@@ -10,6 +10,7 @@ import { useMe } from "../App";
 import { ProjectForm } from "./ProjectForm";
 import { Md } from "../Md";
 import { useToast } from "../toast";
+import { MdToolbar } from "../MdToolbar";
 
 export function Projects() {
   const { t, lang } = useLang();
@@ -150,7 +151,7 @@ export function ProjectDetail() {
                 await api(`/projects/${slug}/updates`, { method: "POST", body: JSON.stringify({ text: msg }) });
                 setMsg(""); location.reload(); }}>
                 <label className="field"><span>{lang === "zh" ? "发布进展" : "Post an update"}</span>
-                  <textarea rows={2} value={msg} onChange={(e: any) => setMsg(e.target.value)} /></label>
+                  <MdToolbar value={msg} onChange={setMsg} rows={2} /></label>
                 <button className="btn small primary">{lang === "zh" ? "发布" : "Post"}</button>
               </form>
             ) : (

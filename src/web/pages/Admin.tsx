@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { MdToolbar } from "../MdToolbar";
+import { Md } from "../Md";
 import { useLang } from "../i18n";
 import { api } from "../api";
 import { useMe } from "../App";
@@ -247,10 +249,44 @@ function ColumnsAdmin() {
           <span className="dname" style={{ fontSize: 15 }}>{col.title}</span>
           <span className="bio">{col.column_label} · {col.author}</span>
           <Link className="btn small" to={`/columns/${col.slug}`} target="_blank">查看</Link>{" "}
+          <ColumnEditor id={col.id} title={col.title} subtitle={col.subtitle ?? ""} existing={{ title: col.title, subtitle: col.subtitle ?? "", slug: col.slug }} onSaved={() => setTick((x) => x + 1)} />
           <button className="btn small danger" onClick={async () => { if (confirm("删除该专栏？")) { await api(`/admin/columns/${col.id}`, { method: "DELETE" }); setTick((x) => x + 1); } }}>删除</button>
         </div>
       ))}
     </section>
+  );
+}
+
+function ColumnEditor({ id, onSaved, existing }: { id: number; title: string; subtitle: string; existing: any; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const openIt = async () => {
+    if (!open && !text) {
+      setLoading(true);
+      const d: any = await fetch(`/api/columns/${(existing as any).slug ?? ""}`).then((r) => r.json()).catch(() => null);
+      setText(d?.column?.text ?? "");
+      setLoading(false);
+    }
+    setOpen(!open);
+  };
+  return (
+    <span>
+      <button className="btn small" onClick={openIt}>编辑</button>
+      {open && (
+        <div style={{ width: "100%", marginTop: 10, border: "1px solid var(--line)", borderRadius: 8, padding: 16 }}>
+          {loading ? <p className="dim">载入中…</p> : (<>
+            <MdToolbar value={text} onChange={setText} rows={8} />
+            <details style={{ margin: "10px 0" }}><summary className="dim" style={{ cursor: "pointer", fontSize: 13 }}>预览</summary><Md text={text} /></details>
+            <button className="btn small primary" onClick={async () => {
+              await api(`/admin/columns/${id}`, { method: "PUT", body: JSON.stringify({ text }) });
+              onSaved(); setOpen(false);
+            }}>保存</button>{" "}
+            <button className="btn small" onClick={() => setOpen(false)}>取消</button>
+          </>)}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -412,7 +448,8 @@ function AdminTools() {
         <b>发布专栏</b>
         <div style={{ marginTop: 8, maxWidth: 560 }}>
           <input type="text" placeholder="标题" value={cTitle} onChange={(e: any) => setCTitle(e.target.value)} required style={{ marginBottom: 8 }} />
-          <textarea rows={4} placeholder="正文" value={cText} onChange={(e: any) => setCText(e.target.value)} required />
+          <MdToolbar value={cText} onChange={setCText} rows={4} placeholder="正文（支持 Markdown、KaTeX、Mermaid）" />
+          {cText && <details style={{ margin: "10px 0" }}><summary className="dim" style={{ cursor: "pointer", fontSize: 13 }}>预览</summary><Md text={cText} /></details>}
           <button className="btn small primary" style={{ marginTop: 8 }}>发布</button>
         </div>
       </form>

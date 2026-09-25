@@ -693,6 +693,21 @@ app.post("/api/admin/comments/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+app.put("/api/admin/columns/:id", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const b = await c.req.json().catch(() => null);
+  const col = await c.env.DB.prepare(`SELECT * FROM columns WHERE id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  if (!col) return err(c, 404, "not found");
+  const topics = (String(b?.text ?? col.text).match(/#([\w\u4e00-\u9fff-]{2,30})/g) ?? []).join(" ");
+  await c.env.DB.prepare(`UPDATE columns SET title = ?, subtitle = ?, text = ?, kind = ?, topics = ? WHERE id = ?`)
+    .bind(str(b?.title, 200) ?? col.title, b?.subtitle !== undefined ? str(b.subtitle, 300) : col.subtitle,
+      str(b?.text, 40000) ?? col.text, ["article", "note", "showcase", "question"].includes(b?.kind) ? b.kind : col.kind,
+      topics, col.id).run();
+  await c.env.DB.prepare(`INSERT INTO audit_log (actor_id, action, detail) VALUES (?, 'column-edit', ?)`).bind(m.id, `column ${col.id}`).run();
+  return c.json({ ok: true });
+});
+
 app.delete("/api/admin/columns/:id", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
