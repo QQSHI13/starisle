@@ -16,7 +16,7 @@ const app = new Hono<{ Bindings: Bindings & { COOKIE_SECURE?: string } }>();
 app.use(secureHeaders({
   contentSecurityPolicy: {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
+    scriptSrc: ["'self'", "'wasm-unsafe-eval'", "https://cdn.jsdelivr.net"],
     styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
     fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
     imgSrc: ["'self'", "data:", "blob:"],
@@ -914,6 +914,46 @@ app.get("/api/search", async (c) => {
     } catch { /* local fallback */ }
   }
   return c.json(local);
+});
+
+// Public search corpus for the client-side marz index. Only fields that are
+// already public (directory-visible) are included: member real names are
+// indexed only when the member chose to make them public.
+app.get("/api/search/docs", async (c) => {
+  const clip = (s: unknown, n: number) => (typeof s === "string" ? s.slice(0, n) : "");
+  const projects = (await c.env.DB.prepare(
+    `SELECT slug, name, tagline, body FROM projects WHERE status = 'approved'`).all()).results as any[];
+  const columns = (await c.env.DB.prepare(
+    `SELECT slug, title, subtitle, topics, author, text FROM columns`).all()).results as any[];
+  const members = (await c.env.DB.prepare(
+    `SELECT id, display_name, bio, username, real_name_public FROM members WHERE status = 'active'`).all()).results as any[];
+  const updates = (await c.env.DB.prepare(
+    `SELECT u.id, u.text, p.slug AS project_slug FROM project_updates u
+     JOIN projects p ON p.id = u.project_id WHERE u.status = 'approved' ORDER BY u.created_at DESC LIMIT 100`).all()).results as any[];
+  const docs: any[] = [];
+  const meta: Record<string, any> = {};
+  for (const p of projects) {
+    const ref = `project:${p.slug}`;
+    docs.push({ ref, title: p.name, text: `${p.tagline}\n${clip(p.body, 3000)}` });
+    meta[ref] = { kind: "project", href: `/projects/${p.slug}`, sub: p.tagline };
+  }
+  for (const col of columns) {
+    const ref = `column:${col.slug}`;
+    docs.push({ ref, title: col.title, text: `${col.subtitle}\n${col.topics}\n${col.author}\n${clip(col.text, 3000)}` });
+    meta[ref] = { kind: "column", href: `/columns/${col.slug}`, sub: `${col.subtitle} ${col.topics}` };
+  }
+  for (const m of members) {
+    const ref = `member:${m.id}`;
+    const name = m.real_name_public ? `${m.display_name} ${m.username ?? ""}` : m.display_name;
+    docs.push({ ref, title: m.display_name, text: `${name}\n${clip(m.bio, 500)}` });
+    meta[ref] = { kind: "member", href: "", sub: m.bio };
+  }
+  for (const u of updates) {
+    const ref = `update:${u.project_slug}:${u.id}`;
+    docs.push({ ref, title: "", text: clip(u.text, 1000) });
+    meta[ref] = { kind: "update", href: `/projects/${u.project_slug}`, sub: "" };
+  }
+  return c.json({ language: "zh", fields: [{ name: "title", boost: 10 }, { name: "text" }], docs, meta });
 });
 
 app.get("/api/stream", async (c) => {
