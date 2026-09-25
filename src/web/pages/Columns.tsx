@@ -3,6 +3,7 @@ import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
 import { Md } from "../Md";
 import { api } from "../api";
+import { useToast } from "../toast";
 import { useMe } from "../App";
 import { Avatar } from "../Avatar";
 import { useState } from "react";
@@ -14,6 +15,7 @@ function Comments({ targetId }: { targetId: number }) {
   const [text, setText] = useState("");
   const { data } = useFetch<{ comments: any[] }>(`/comments/list?target=${targetId}`, [tick, targetId]);
   const [note, setNote] = useState<string | null>(null);
+  const toast = useToast();
   const items = data?.comments ?? [];
   return (
     <section style={{ maxWidth: 700, marginBottom: 60 }}>
@@ -31,7 +33,7 @@ function Comments({ targetId }: { targetId: number }) {
       {me ? (
         <form onSubmit={async (e) => { e.preventDefault(); if (!text.trim()) return;
           setNote(null);
-          try { await api("/comments", { method: "POST", body: JSON.stringify({ target_type: "column", target_id: targetId, text }) }); setText(""); setNote(lang === "zh" ? "已提交，审核通过后公开。" : "Submitted — visible after review."); setTick((x) => x + 1); }
+          try { await api("/comments", { method: "POST", body: JSON.stringify({ target_type: "column", target_id: targetId, text }) }); setText(""); toast(lang === "zh" ? "评论已提交，审核后公开" : "Submitted"); setTick((x) => x + 1); }
           catch (e2: any) { setNote(String(e2.message)); } }}>
           {note && <div className="notice" role="status">{note}</div>}
           <label className="field"><span>{lang === "zh" ? "写下你的想法（支持 Markdown、KaTeX 公式、Mermaid 图）" : "Your thoughts (Markdown, KaTeX, Mermaid supported)"}</span>

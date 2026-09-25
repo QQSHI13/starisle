@@ -837,6 +837,46 @@ app.get("/api/search", async (c) => {
   return c.json(local);
 });
 
+app.get("/api/stream", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT 'update' AS kind, u.created_at, m.display_name AS author, p.name AS subject, p.slug AS slug, u.text AS body, NULL AS extra
+     FROM project_updates u JOIN projects p ON p.id = u.project_id AND p.status='approved' JOIN members m ON m.id = u.author_id WHERE u.status='approved'
+     UNION ALL
+     SELECT 'project', p.created_at, m.display_name, p.name, p.slug, p.tagline, NULL FROM projects p JOIN members m ON m.id = p.owner_id WHERE p.status='approved'
+     UNION ALL
+     SELECT 'column', published_at || ' 09:00:00', author, title, slug, subtitle, NULL FROM columns
+     ORDER BY created_at DESC LIMIT 40`).all();
+  return c.json({ items: results });
+});
+
+app.post("/api/activities/:id/rsvp", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const a = await c.env.DB.prepare(`SELECT id FROM activities WHERE id = ?`).bind(Number(c.req.param("id"))).first();
+  if (!a) return err(c, 404, "activity not found");
+  const existing = await c.env.DB.prepare(`SELECT id FROM rsvps WHERE activity_id = ? AND member_id = ?`).bind(Number(c.req.param("id")), m.id).first();
+  if (existing) await c.env.DB.prepare(`DELETE FROM rsvps WHERE id = ?`).bind((existing as any).id).run();
+  else await c.env.DB.prepare(`INSERT OR IGNORE INTO rsvps (activity_id, member_id) VALUES (?,?)`).bind(Number(c.req.param("id")), m.id).run();
+  const count = await c.env.DB.prepare(`SELECT COUNT(*) n FROM rsvps WHERE activity_id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  return c.json({ going: !existing, count: count?.n ?? 0 });
+});
+
+app.get("/api/activities/:id/rsvp", async (c) => {
+  const count = await c.env.DB.prepare(`SELECT COUNT(*) n FROM rsvps WHERE activity_id = ?`).bind(Number(c.req.param("id"))).first<any>();
+  return c.json({ count: count?.n ?? 0 });
+});
+
+// weekly digest — call from cron/systemd: curl -H "X-Admin-Key: $DIGEST_KEY" /api/cron/digest
+app.get("/api/cron/digest", async (c) => {
+  if (!process_env.DIGEST_KEY || c.req.header("X-Admin-Key") !== process_env.DIGEST_KEY) return err(c, 403, "forbidden");
+  const updates = await c.env.DB.prepare(`SELECT COUNT(*) n FROM project_updates WHERE status='approved' AND created_at > datetime('now','-7 days')`).first<any>();
+  const projects = await c.env.DB.prepare(`SELECT COUNT(*) n FROM projects WHERE status='approved' AND created_at > datetime('now','-7 days')`).first<any>();
+  const pend = await c.env.DB.prepare(`SELECT COUNT(*) n FROM applications WHERE status='pending'`).first<any>();
+  const text = `周报：本周 ${updates?.n ?? 0} 条项目动态、${projects?.n ?? 0} 个新项目上线。待审申请 ${pend?.n ?? 0} 条。`;
+  const r = await c.env.DB.prepare(`INSERT INTO notifications (member_id, text, type) SELECT id, ?, 'announce' FROM members WHERE status='active'`).bind(text).run();
+  return c.json({ ok: true, notified: r.meta.changes, text });
+});
+
 app.get("/api/feed", async (c) => {
   const updates = await c.env.DB.prepare(
     `SELECT u.text, u.created_at, m.display_name AS author, p.name AS project_name, p.slug AS project_slug

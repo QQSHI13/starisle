@@ -1,10 +1,22 @@
 import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
+import { api } from "../api";
+import { useMe } from "../App";
+import { useState } from "react";
+import { useToast } from "../toast";
 
 export function Activities() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const { me } = useMe();
+  const toast = useToast();
   const { data } = useFetch<{ activities: any[] }>("/activities");
+  const [counts, setCounts] = useState<Record<number, number>>({});
   const items = data?.activities ?? [];
+  const rsvp = async (id: number) => {
+    const r = await api(`/activities/${id}/rsvp`, { method: "POST" });
+    setCounts((c) => ({ ...c, [id]: r.count }));
+    toast(r.going ? (lang === "zh" ? "已报名" : "RSVP'd") : (lang === "zh" ? "已取消报名" : "Cancelled"));
+  };
   return (
     <>
       <div className="page-head"><div className="wrap">
@@ -21,7 +33,9 @@ export function Activities() {
               <div className="card" key={a.id}>
                 <h3>{a.title}</h3>
                 <p className="tagline">{a.description}</p>
-                <div className="meta"><span>{a.starts_at}</span>{a.location && <span>{a.location}</span>}</div>
+                <div className="meta"><span>{a.starts_at}</span>{a.location && <span>{a.location}</span>}
+                  {me && <button className="btn small" onClick={() => rsvp(a.id)}>{lang === "zh" ? "报名" : "RSVP"} · {counts[a.id] ?? "?"}</button>}
+                </div>
               </div>
             ))}
           </div>

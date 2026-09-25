@@ -8,7 +8,7 @@ import { useState } from "react";
 
 export function Students() {
   const { t } = useLang();
-  const { data } = useFetch<{ members: any[] }>("/members");
+  const { data, loading } = useFetch<{ members: any[] }>("/members");
   const [q, setQ] = useState("");
   const members = (data?.members ?? []).filter((m) =>
     !q.trim() || (m.display_name + (m.username ?? "") + (m.bio ?? "")).toLowerCase().includes(q.trim().toLowerCase()));
@@ -20,6 +20,7 @@ export function Students() {
         <p className="sub">{t.students_sub}</p>
       </div></div>
       <section className="block"><div className="wrap">
+        {loading && [0,1,2,3,4].map((i) => <div key={i} className="skel" style={{ height: 40, marginBottom: 10 }} />)}
         <div className="toolbar">
           <input type="text" placeholder="搜索成员…" value={q} onChange={(e: any) => setQ(e.target.value)} style={{ width: 260 }} aria-label="搜索成员" />
         </div>
@@ -60,6 +61,11 @@ export function Profile() {
           )}
         </h1>
         {m.bio && <p className="sub">{m.bio}</p>}
+        <p style={{ marginTop: 10 }}>
+          {data.projects.length > 0 && <span className="pill gold">项目成员</span>}{" "}
+          {data.projects.length >= 2 && <span className="pill gold">多项目玩家</span>}{" "}
+          {m.verified ? <span className="pill gold">已认证</span> : null}
+        </p>
         {m.website_url && <p className="sub"><a href={m.website_url} target="_blank" rel="noreferrer">{m.website_url}</a></p>}
 
       </div></div>

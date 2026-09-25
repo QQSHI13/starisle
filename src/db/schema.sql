@@ -331,3 +331,11 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_id, to_id, created_at);
+
+CREATE TABLE IF NOT EXISTS rsvps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (activity_id, member_id)
+);

@@ -9,6 +9,7 @@ import { api } from "../api";
 import { useMe } from "../App";
 import { ProjectForm } from "./ProjectForm";
 import { Md } from "../Md";
+import { useToast } from "../toast";
 
 export function Projects() {
   const { t, lang } = useLang();
@@ -21,7 +22,7 @@ export function Projects() {
     const s = p.toString();
     return "/projects" + (s ? `?${s}` : "");
   }, [q, domain]);
-  const { data, error } = useFetch<{ projects: any[] }>(query, [query]);
+  const { data, error, loading } = useFetch<{ projects: any[] }>(query, [query]);
   const { data: domData } = useFetch<{ domains: any[] }>("/domains");
 
   return (
@@ -42,6 +43,7 @@ export function Projects() {
           </select>
         </div>
         {error && <div className="error-box" role="alert">{error}</div>}
+        {loading && <div className="grid">{[0,1,2,3,4,5].map((i) => <div key={i} className="skel skel-card" />)}</div>}
         <div className="grid">
           {(data?.projects ?? []).map((p) => <ProjectCard key={p.slug} p={p} />)}
         </div>
@@ -56,6 +58,7 @@ export function ProjectDetail() {
   const { t, lang } = useLang();
   const { data, error } = useFetch<{ project: any; members: any[]; gaps: string[]; stack: string[]; milestones: any[]; updates: any[]; repo_stats: any; followers: number; following: boolean }>(`/projects/${slug}`, [slug]);
   const { me, refresh } = useMe();
+  const toast = useToast();
   const [sp] = useSearchParams();
   const editing = sp.get("edit") === "1";
   const [msg, setMsg] = useState("");
@@ -134,7 +137,7 @@ export function ProjectDetail() {
           <p>
             <button className="btn small" onClick={async () => {
               await api(`/projects/${slug}/follow`, { method: data.following ? "DELETE" : "POST" });
-              location.reload();
+              toast(data.following ? "已取消关注" : "已关注"); setTimeout(() => location.reload(), 600);
             }}>{data.following ? (lang === "zh" ? "已关注 ✓" : "Following ✓") : (lang === "zh" ? "关注这个项目" : "Follow")}</button>
             <span className="dim" style={{ marginLeft: 10, fontSize: 13 }}>{data.followers} {lang === "zh" ? "人关注" : "followers"}</span>
           </p>
@@ -153,7 +156,7 @@ export function ProjectDetail() {
             ) : (
               <form onSubmit={async (e) => { e.preventDefault();
                 await api(`/projects/${slug}/join`, { method: "POST", body: JSON.stringify({ message: msg }) });
-                setNote(lang === "zh" ? "已提交加入申请" : "Join request sent"); setMsg(""); refresh(); }}>
+                toast(lang === "zh" ? "加入申请已发送" : "Join request sent"); setMsg(""); }}>
                 <label className="field"><span>{t.join_project}</span>
                   <textarea rows={2} placeholder={lang === "zh" ? "给项目发起人留言（选填）" : "Message for the owner (optional)"} value={msg} onChange={(e: any) => setMsg(e.target.value)} /></label>
                 <button className="btn small primary">{t.join_project}</button>

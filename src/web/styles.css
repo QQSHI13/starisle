@@ -323,3 +323,12 @@ footer.site .legal { margin-top: 52px; padding-top: 20px; border-top: 1px solid 
 .comment .who b { font-family: var(--serif); font-size: 15px; }
 .comment .body { font-size: 14.5px; line-height: 1.7; white-space: pre-wrap; }
 .comment.pending { border-style: dashed; opacity: 0.75; }
+
+/* ---------- toasts & skeletons ---------- */
+.toast-stack { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+.toast { background: var(--ink); color: var(--paper); padding: 10px 20px; border-radius: 999px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: toastIn .18s ease; }
+.toast.err { background: #a33d2e; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(8px); } }
+.skel { border-radius: 6px; background: linear-gradient(90deg, var(--paper-2) 25%, var(--line) 50%, var(--paper-2) 75%); background-size: 200% 100%; animation: skel 1.2s infinite; }
+@keyframes skel { to { background-position: -200% 0; } }
+.skel-card { height: 150px; border: 1px solid var(--line); }

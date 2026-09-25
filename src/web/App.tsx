@@ -15,6 +15,7 @@ import Me from "./pages/Me";
 import Admin from "./pages/Admin";
 import DM from "./pages/DM";
 import Search from "./pages/Search";
+import Stream from "./pages/Stream";
 
 export type Member = {
   id: number; username: string; display_name: string; role: string;
@@ -96,7 +97,7 @@ function Layout({ children }: { children: ReactNode }) {
   const { me, logout } = useMe();
   const nav = useNavigate();
   const links = [
-    ["/projects", t.nav_projects], ["/courses", t.nav_courses], ["/columns", t.nav_columns],
+    ["/projects", t.nav_projects], ["/courses", t.nav_courses], ["/stream", lang === "zh" ? "动态" : "Stream"], ["/columns", t.nav_columns],
     ["/activities", t.nav_activities], ["/students", t.nav_students],
     ["/resources", t.nav_resources], ["/mentors", t.nav_mentors],
   ] as const;
@@ -187,6 +188,7 @@ export default function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/dm" element={<DM />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/stream" element={<Stream />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>

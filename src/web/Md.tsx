@@ -4,26 +4,31 @@ import { marked } from "marked";
 // Lazy loaders — heavy libraries load from CDN only when content needs them.
 const CDN = ["https://cdn.jsdelivr.net/npm", "https://unpkg.com", "https://cdnjs.cloudflare.com/ajax"];
 const tryImport = async (paths: string[]) => {
+  for (const p of paths) {
+    const url = p.startsWith("http") || p.startsWith("/") ? p : `${CDN[0]}/${p}`;
+    try { return await import(/* @vite-ignore */ url); } catch { /* try next CDN form */ }
+  }
   for (const base of CDN) {
     for (const p of paths) {
-      const url = p.startsWith("http") ? p : `${base}/${p}`;
-      try { return await import(/* @vite-ignore */ url); } catch { /* try next */ }
+      if (p.startsWith("http") || p.startsWith("/")) continue;
+      try { return await import(/* @vite-ignore */ `${base}/${p}`); } catch { /* next */ }
     }
   }
-  throw new Error("all CDNs unreachable");
+  throw new Error("all sources unreachable");
 };
 let katexLoading: Promise<any> | null = null;
 const loadKatex = () => {
   if (!katexLoading) {
     katexLoading = Promise.all([
-      tryImport(["katex@0.16.11/dist/katex.min.mjs", "katex@0.16.11/dist/katex.min.js", "katex/0.16.11/katex.min.mjs"]).then((m) => m.default ?? m),
+      tryImport(["/vendor/katex/katex.min.mjs", "katex@0.16.11/dist/katex.min.mjs"]).then((m) => m.default ?? m),
       new Promise<void>((res) => {
         let i = 0;
+        const HREFS = ["/vendor/katex/katex.min.css", ...CDN.map((b) => `${b}/katex@0.16.11/dist/katex.min.css`)];
         const attempt = () => {
-          if (i >= CDN.length) return res();
+          if (i >= HREFS.length) return res();
           const l = document.createElement("link");
           l.rel = "stylesheet";
-          l.href = `${CDN[i]}/katex@0.16.11/dist/katex.min.css`;
+          l.href = HREFS[i];
           i++;
           l.onload = () => res();
           l.onerror = () => attempt();
@@ -38,7 +43,7 @@ const loadKatex = () => {
 let mermaidLoading: Promise<any> | null = null;
 const loadMermaid = () => {
   if (!mermaidLoading) {
-    mermaidLoading = tryImport(["mermaid@11/dist/mermaid.esm.min.mjs", "mermaid@11/dist/mermaid.min.js", "mermaid/11.4.0/mermaid.esm.min.mjs"])
+    mermaidLoading = tryImport(["/vendor/mermaid/mermaid.esm.min.mjs", "mermaid@11/dist/mermaid.esm.min.mjs"])
       .then((m) => {
         const lib = m.default ?? m;
         lib.initialize({ startOnLoad: false, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral" });
