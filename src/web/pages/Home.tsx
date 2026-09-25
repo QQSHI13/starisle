@@ -34,9 +34,32 @@ function CommandCenter() {
   const { t, lang } = useLang();
   const { me } = useMe();
   const [dash, setDash] = useState<any>(null);
+  const [site, setSite] = useState<any>(null);
   useEffect(() => { api("/my/dashboard").then(setDash).catch(() => {}); }, []);
+  useEffect(() => {
+    if (me && me.role !== "member") api("/stats").then(setSite).catch(() => {});
+  }, [me]);
   if (!dash) return <div className="loading">{t.loading}</div>;
+  const zh = lang === "zh";
   const un = dash.notifications.filter((n: any) => !n.read).length;
+  const stats = [
+    { icon: "bell", n: un, label: zh ? "未读消息" : "Unread", hot: un > 0 },
+    { icon: "folder", n: dash.projects.filter((p: any) => p.status === "pending").length, label: zh ? "审核中的项目" : "Projects pending", hot: false },
+    { icon: "cap", n: dash.homework.pending.length, label: zh ? "待交作业" : "Homework due", hot: dash.homework.pending.length > 0 },
+    { icon: "inbox", n: dash.join_requests.length, label: zh ? "加入申请" : "Join requests", hot: dash.join_requests.length > 0 },
+  ];
+  const community = site ? [
+    { icon: "users", n: site.members, label: zh ? "社区成员" : "Members" },
+    { icon: "folder", n: site.projects, label: zh ? "进行中的项目" : "Projects" },
+    { icon: "book", n: site.courses, label: zh ? "门课程" : "Courses" },
+    { icon: "calendar", n: site.activities, label: zh ? "场活动" : "Events" },
+  ] : null;
+  const quicks = [
+    { icon: "user", to: "/me", label: zh ? "个人中心" : "My account", sub: zh ? "资料、消息与通知" : "Profile & messages" },
+    { icon: "trend", to: "/stream", label: zh ? "社区动态" : "Stream", sub: zh ? "项目进展与专栏" : "Updates & columns" },
+    { icon: "folder", to: "/projects", label: zh ? "浏览项目" : "Projects", sub: zh ? "成员们的开源作品" : "Open-source work" },
+    { icon: "book", to: "/courses", label: zh ? "我的课程" : "Courses", sub: zh ? "课节与作业" : "Lessons & homework" },
+  ];
   const section = (icon: string, title: string, children: any) => (
     <section className="block reveal"><div className="wrap">
       <div className="block-head"><h2 style={{ display: "flex", alignItems: "center", gap: 10 }}><I name={icon} size={20} />{title}</h2></div>
@@ -44,27 +67,47 @@ function CommandCenter() {
     </div></section>
   );
   return (<>
-    <section className="hero" style={{ padding: "64px 0 40px" }}><div className="wrap">
-      <p className="kicker">{lang === "zh" ? "指挥中心" : "Command center"}</p>
-      <h1 style={{ fontSize: 40 }}>{lang === "zh" ? `欢迎回来，` : "Welcome back, "}{me?.display_name}。</h1>
-      <div className="stats" style={{ marginTop: 34 }}>
-        <div><b style={{ color: un ? "var(--gold)" : undefined }}>{un}</b><span><I name="bell" size={12} /> {lang === "zh" ? "未读消息" : "unread"}</span></div>
-        <div><b>{dash.projects.filter((p: any) => p.status === "pending").length}</b><span>{lang === "zh" ? "审核中的项目" : "projects pending"}</span></div>
-        <div><b>{dash.homework.pending.length}</b><span>{lang === "zh" ? "待交作业" : "homework due"}</span></div>
-        <div><b>{dash.join_requests.length}</b><span>{lang === "zh" ? "加入申请" : "join requests"}</span></div>
+    <section className="hero" style={{ padding: "64px 0 48px" }}><div className="wrap">
+      <p className="kicker">{zh ? "指挥中心" : "Command center"}</p>
+      <h1 style={{ fontSize: 40 }}>{zh ? `欢迎回来，` : "Welcome back, "}{me?.display_name}。</h1>
+      <div className="stat-cards">
+        {stats.map((s) => (
+          <div className={`stat-card${s.hot ? " hot" : ""}`} key={s.label}>
+            <I name={s.icon} size={16} />
+            <b>{s.n}</b>
+            <span>{s.label}</span>
+          </div>
+        ))}
       </div>
-      <div className="cta" style={{ marginTop: 26 }}>
-        <Link className="btn primary" to="/me">{lang === "zh" ? "个人中心" : "My account"}</Link>
-        <Link className="btn" to="/stream">{lang === "zh" ? "社区动态" : "Stream"}</Link>
-        <Link className="btn" to="/projects">{lang === "zh" ? "浏览项目" : "Projects"}</Link>
+      {community && (
+        <div className="stat-cards community">
+          {community.map((s) => (
+            <div className="stat-card" key={s.label}>
+              <I name={s.icon} size={16} />
+              <b>{s.n}</b>
+              <span>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="quick-grid">
+        {quicks.map((q) => (
+          <Link className="quick" to={q.to} key={q.to}>
+            <I name={q.icon} size={18} />
+            <span className="qt"><b>{q.label}</b><small>{q.sub}</small></span>
+            <span className="qgo">→</span>
+          </Link>
+        ))}
       </div>
     </div></section>
-    {dash.followed_updates.length > 0 && section("trend", lang === "zh" ? "关注项目的最新动态" : "Followed projects", (
+    {dash.followed_updates.length > 0 && section("trend", zh ? "关注项目的最新动态" : "Followed projects", (
       <div className="grid">{dash.followed_updates.map((u: any, i: number) => (
         <Link className="card" key={i} to={`/projects/${u.slug}`}><span className="pill">{u.name}</span><p className="tagline" style={{ color: "var(--ink)" }}>{u.text}</p><div className="meta"><span>{u.author}</span><span>{u.created_at.slice(0, 16)}</span></div></Link>
       ))}</div>
     ))}
-    {section("folder", t.my_projects, dash.projects.length === 0 ? <p className="dim">—</p> : dash.projects.map((p: any) => (
+    {section("folder", t.my_projects, dash.projects.length === 0 ? (
+      <div className="empty"><b>{zh ? "还没有项目" : "No projects yet"}</b>{zh ? "去项目广场看看同龄人在做什么，或从个人中心发起第一个项目。" : "Browse what others are building, or start your first project from your account page."}<br /><Link className="btn small" style={{ marginTop: 14 }} to="/projects">{zh ? "浏览项目" : "Browse projects"} →</Link></div>
+    ) : dash.projects.map((p: any) => (
       <div className="member-row" key={p.slug}><span className="dname" style={{ fontSize: 16 }}><Link to={`/projects/${p.slug}`}>{p.name}</Link></span>
         {p.status === "pending" && <span className="pill gold">{t.pending_review}</span>}<span className="bio">{p.tagline}</span></div>
     )))}
@@ -209,3 +252,4 @@ export default function Home() {
 const Star = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2 14.3 9.7 21.8 12 14.3 14.3 12 21.8 9.7 14.3 2.2 12 9.7 9.7Z" /></svg>
 );
+
