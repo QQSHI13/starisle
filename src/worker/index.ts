@@ -845,7 +845,7 @@ app.get("/api/stream", async (c) => {
      SELECT 'project', p.created_at, m.display_name, p.name, p.slug, p.tagline, NULL FROM projects p JOIN members m ON m.id = p.owner_id WHERE p.status='approved'
      UNION ALL
      SELECT 'column', published_at || ' 09:00:00', author, title, slug, subtitle, NULL FROM columns
-     ORDER BY created_at DESC LIMIT 40`).all();
+     ORDER BY 2 DESC LIMIT 40`).all();
   return c.json({ items: results });
 });
 
