@@ -809,23 +809,24 @@ app.get("/api/search", async (c) => {
   const q = (c.req.query("q") ?? "").trim().slice(0, 80);
   if (!q) return c.json({ results: [] });
   const tokens = q.split(/\s+/).filter(Boolean);
-  const clause = (col: string) => tokens.map(() => `${col} LIKE ?`).join(" AND ");
-  const args = (col: string) => tokens.map((t) => `%${t}%`);
-  const rank = (t: string) => tokens.map(() => `CASE WHEN ${t} LIKE ? THEN 1 ELSE 0 END`).join("+");
-  const rankArgs = tokens.map((t) => `${t}%`);
+  // each token may match ANY of the entity's fields (AND across tokens, OR across fields)
+  const anyOf = (cols: string[]) => "(" + tokens.map(() => `(${cols.map((col) => `${col} LIKE ?`).join(" OR ")})`).join(" AND ") + ")";
+  const binds = (cols: string[]) => tokens.flatMap((t) => cols.map(() => `%${t}%`));
+  const rankOf = (cols: string[]) => tokens.map(() => `(${cols.map((col) => `CASE WHEN ${col} LIKE ? THEN 1 ELSE 0 END`).join(" + ")})`).join(" + ");
+  const rankB = (cols: string[]) => tokens.flatMap((t) => cols.map(() => `${t}%`));
   const projects = await c.env.DB.prepare(
-    `SELECT slug, name, tagline FROM projects WHERE status='approved' AND (${clause("name")} OR ${clause("tagline")} OR ${clause("body")})
-     ORDER BY ${rank("name")}+${rank("tagline")} DESC LIMIT 10`).bind(...args("name"), ...args("tagline"), ...args("body"), ...rankArgs, ...rankArgs).all();
+    `SELECT slug, name, tagline FROM projects WHERE status='approved' AND ${anyOf(["name", "tagline", "body"])}
+     ORDER BY ${rankOf(["name", "tagline"])} DESC LIMIT 10`).bind(...binds(["name", "tagline", "body"]), ...rankB(["name", "tagline"])).all();
   const columns = await c.env.DB.prepare(
-    `SELECT slug, title, subtitle, topics, kind FROM columns WHERE ${clause("title")} OR ${clause("text")} OR ${clause("topics")}
-     ORDER BY ${rank("title")} DESC LIMIT 10`).bind(...args("title"), ...args("text"), ...args("topics"), ...rankArgs).all();
+    `SELECT slug, title, subtitle, topics, kind FROM columns WHERE ${anyOf(["title", "text", "topics", "author"])}
+     ORDER BY ${rankOf(["title", "author"])} DESC LIMIT 10`).bind(...binds(["title", "text", "topics", "author"]), ...rankB(["title", "author"])).all();
   const members = await c.env.DB.prepare(
-    `SELECT id, display_name, bio FROM members WHERE status='active' AND (${clause("display_name")} OR ${clause("bio")})
-     ORDER BY ${rank("display_name")} DESC LIMIT 10`).bind(...args("display_name"), ...args("bio"), ...rankArgs).all();
+    `SELECT id, display_name, bio FROM members WHERE status='active' AND ${anyOf(["display_name", "bio", "username"])}
+     ORDER BY ${rankOf(["display_name"])} DESC LIMIT 10`).bind(...binds(["display_name", "bio", "username"]), ...rankB(["display_name"])).all();
   const updates = await c.env.DB.prepare(
     `SELECT u.text, u.created_at, p.slug AS project_slug, p.name AS project_name FROM project_updates u
-     JOIN projects p ON p.id = u.project_id WHERE u.status='approved' AND ${clause("u.text")}
-     ORDER BY u.created_at DESC LIMIT 5`).bind(...args("u.text")).all();
+     JOIN projects p ON p.id = u.project_id WHERE u.status='approved' AND ${anyOf(["u.text", "p.name"])}
+     ORDER BY u.created_at DESC LIMIT 5`).bind(...binds(["u.text", "p.name"])).all();
   const local = { projects: projects.results, columns: columns.results, members: members.results, updates: updates.results };
   const searchUrl = process_env.SEARCH_URL;
   if (searchUrl) {
