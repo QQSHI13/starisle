@@ -22,6 +22,7 @@ export default function Admin() {
   return (
     <div className="wrap" style={{ padding: "64px 24px" }}>
       <h1 className="serif" style={{ fontSize: 32 }}>{t.admin}</h1>
+      <Overview />
 
       <section style={{ padding: "28px 0" }}>
         <h3>{t.admin_apps}</h3>
@@ -31,7 +32,12 @@ export default function Admin() {
             {(apps ?? []).filter((a: any) => a.status === "pending") .map((a: any) => (
               <tr key={a.id}>
                 <td>{a.username}</td><td>{a.display_name}</td><td>{a.email}</td>
-                <td className="dim" style={{ maxWidth: 320 }}>{a.statement}</td>
+                <td className="dim" style={{ maxWidth: 320 }}>{a.statement}
+                  <span style={{ display: "block", marginTop: 4 }}>
+                    {a.email_verified ? <span className="pill gold">邮箱已验证</span> : <span className="pill">邮箱未验证</span>}{" "}
+                    {!!a.is_minor && <span className="pill gold">未成年{a.guardian_name ? ` · 监护人:${a.guardian_name}` : ""}</span>}
+                  </span>
+                </td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button className="btn small primary" onClick={() => decide("/admin/applications", a.id, "approve")}>{t.approve}</button>{" "}
                   <Reject onOk={(reason) => decide("/admin/applications", a.id, "reject", reason)} label={t.reject} />{" "}
@@ -88,6 +94,26 @@ function useFetchData<T>(path: string | null, enabled: boolean) {
   const res = useFetch<{ [k: string]: T }>(enabled && path ? path : null, [tick, enabled]);
   const key = path?.split("/").pop() ?? "";
   return { data: res.data ? (res.data as any)[key === "applications" ? "applications" : key === "projects" ? "projects" : "enrollments"] : null, refresh: () => setTick(tick + 1) };
+}
+
+function Overview() {
+  const { data } = useFetch<any>("/admin/overview", []);
+  if (!data) return null;
+  const items = [
+    ["待审申请", data.pending_applications], ["待审项目", data.pending_projects], ["待审动态", data.pending_updates],
+    ["待审评论", data.pending_comments], ["待处理举报", data.pending_reports], ["待对接导师", data.pending_mentors],
+    ["待批改作业", data.pending_submissions], ["成员", data.members], ["未成年成员", data.minors], ["上线项目", data.projects],
+  ] as const;
+  return (
+    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", margin: "24px 0 40px" }}>
+      {items.map(([label, n]) => (
+        <div key={label} className="card" style={{ padding: "16px 18px", gap: 4 }}>
+          <b className="serif" style={{ fontSize: 30, lineHeight: 1, color: n > 0 && label.startsWith("待") ? "var(--gold)" : "var(--ink)" }}>{n}</b>
+          <span className="dim" style={{ fontSize: 12.5 }}>{label}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function UpdatesQueue() {

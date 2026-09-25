@@ -1266,6 +1266,24 @@ app.delete("/api/admin/applications/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+app.get("/api/admin/overview", async (c) => {
+  const m = await currentUser(c);
+  if (!m || m.role !== "admin") return err(c, 403, "admin only");
+  const one = async (sql: string) => (await c.env.DB.prepare(sql).first<any>())?.n ?? 0;
+  return c.json({
+    pending_applications: await one(`SELECT COUNT(*) n FROM applications WHERE status='pending'`),
+    pending_projects: await one(`SELECT COUNT(*) n FROM projects WHERE status='pending'`),
+    pending_updates: await one(`SELECT COUNT(*) n FROM project_updates WHERE status='pending'`),
+    pending_comments: await one(`SELECT COUNT(*) n FROM comments WHERE status='pending'`),
+    pending_reports: await one(`SELECT COUNT(*) n FROM reports WHERE status='pending'`),
+    pending_mentors: await one(`SELECT COUNT(*) n FROM mentor_requests WHERE status='pending'`),
+    pending_submissions: await one(`SELECT COUNT(*) n FROM submissions WHERE status='pending'`),
+    members: await one(`SELECT COUNT(*) n FROM members WHERE status='active'`),
+    minors: await one(`SELECT COUNT(*) n FROM members WHERE status='active' AND is_minor=1`),
+    projects: await one(`SELECT COUNT(*) n FROM projects WHERE status='approved'`),
+  });
+});
+
 app.get("/api/admin/members", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");

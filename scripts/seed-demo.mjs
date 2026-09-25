@@ -11,10 +11,7 @@ const hash = pbkdf2Sync("starisle-dev", "demo-salt", 100_000, 32, "sha256").toSt
 const q = (sql, ...a) => db.prepare(sql).run(...a);
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 
-if (one("SELECT 1 x FROM columns WHERE slug='demo-building-in-public'")) {
-  console.log("demo content already present — nothing to do");
-  process.exit(0);
-}
+
 
 // demo members (roles for the storyline)
 for (const [u, d, role] of [["林小满", "小满", "member"], ["陈以恒", "以恒", "member"]]) {
@@ -49,6 +46,7 @@ q(`INSERT OR IGNORE INTO project_follows (project_id, member_id) VALUES (?, (SEL
 q(`INSERT OR IGNORE INTO member_follows (followee_id, follower_id) VALUES (?,(SELECT id FROM members WHERE username='施清荃'))`, xiaoman);
 
 // flagship demo column: markdown + KaTeX + mermaid showcase
+if (!one("SELECT 1 x FROM columns WHERE slug='demo-building-in-public'"))
 q(`INSERT INTO columns (slug, column_label, title, subtitle, author, author_title, text, published_at)
    VALUES ('demo-building-in-public','社区投稿','在星屿，一个想法怎么变成作品','从「我想试试」到「跑起来了」：三位成员的真实项目手记','林小满','星屿社区成员 · 校园河流观察站发起人',
 '有人说青少年做项目就是玩。我们想用这篇文章回答：**怎么把一个模糊的想法，做成一个真的能跑、有人用、还在生长的作品。**
@@ -132,4 +130,37 @@ q(`INSERT OR IGNORE INTO join_requests (project_id, member_id, message) VALUES (
 // a notification for admin/demo user
 q(`INSERT INTO notifications (member_id, text, type) SELECT id, '路演报名开启：各组负责人记得在周五前更新项目展板。', 'announce' FROM members WHERE username='施清荃'`);
 
+// more life: updates across real projects, a note post, mentor request, more comments
+const moreUpdates = [
+  ["p-2c3879", "李剑", "2D 版 now runs on phones — 触屏操作修完了，欢迎试玩"],
+  ["harry-potter", "朱天野", "魔咒系统重构完成，现在可以组合施法了"],
+  ["3d", "施清荃", "3D 场景LOD优化，帧率从 22 提到 55"],
+  ["p-be8ab8", "袁梦雷", "机械臂视觉标定第 3 版，抓取成功率 87%"],
+];
+for (const [slug, owner, text] of moreUpdates) {
+  q(`INSERT INTO project_updates (project_id, author_id, text, status, created_at)
+     SELECT p.id, m.id, ?, 'approved', datetime('now', '-' || (abs(random()) % 50 + 2) || ' hours')
+     FROM projects p JOIN members m ON m.username = ?
+     WHERE p.slug = ? AND NOT EXISTS (SELECT 1 FROM project_updates u WHERE u.project_id = p.id AND u.text = ?)`,
+     text, owner, slug, text);
+}
+// second column: a short note kind with topics
+q(`INSERT INTO columns (slug, column_label, title, subtitle, author, author_title, text, kind, topics, published_at)
+   SELECT 'demo-weekly-no1','社区投稿','星屿周报 · 第 1 期','两周里，社区里发生的事','演示管理员','星屿运营组',
+   '## 本周数字\n\n- 新增项目动态 **6** 条\n- 路演报名开启\n- 河流观察站完成 14 天采样\n\n## 值得关注\n\n#硬件 组的机械臂标定到了第 3 版；#游戏 组的大宋英雄传 2D 支持手机了。\n\n> 下周开始，每周日晚更新。',
+   'note', '#周报 #硬件 #游戏', date('now','-2 day')
+   WHERE NOT EXISTS (SELECT 1 FROM columns WHERE slug='demo-weekly-no1')`);
+// pending mentor request for admin queue
+q(`INSERT INTO mentor_requests (member_id, mentor_id, interest, background, questions, status)
+   SELECT (SELECT id FROM members WHERE username='林小满'), (SELECT id FROM mentors WHERE name='张雨桐'),
+   '想用数学模型解释我们测到的浊度数据', '初一，学过一元一次方程和基础统计', '线性回归需要什么前提？我们的样本量够吗？', 'pending'
+   WHERE NOT EXISTS (SELECT 1 FROM mentor_requests WHERE interest LIKE '%浊度%')`);
+// extra approved comments on demo column
+q(`INSERT INTO comments (target_type, target_id, author_id, text, status, created_at)
+   SELECT 'column', c.id, (SELECT id FROM members WHERE username='陈以恒'), '公式渲染出来了！我们报告里也想用这样的排版。', 'approved', datetime('now','-6 hours')
+   FROM columns c WHERE c.slug='demo-building-in-public'
+     AND NOT EXISTS (SELECT 1 FROM comments WHERE text LIKE '%报告里也想用%')`);
+// rsvps for the event
+q(`INSERT OR IGNORE INTO rsvps (activity_id, member_id)
+   SELECT a.id, m.id FROM activities a, members m WHERE m.username IN ('林小满','陈以恒','施清荃') AND a.title LIKE '%路演%'`);
 console.log("demo content installed: project, column (md+katex+mermaid), comments, events, resources, lessons, homework, submission, join request, notification");
