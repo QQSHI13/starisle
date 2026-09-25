@@ -44,7 +44,7 @@ const run = async () => {
   const members = await get("/api/members");
   ok("GET /api/members", members.status === 200 && Array.isArray(members.body?.members));
 
-  const profile = await get(`/api/members/${encodeURIComponent("林小满")}`);
+  const profile = await get(`/api/members/${encodeURIComponent("演示管理员")}`);
   ok("GET /api/members/:username (profile)", profile.status === 200
     && Array.isArray(profile.body?.followers) && Array.isArray(profile.body?.activity));
 
@@ -75,9 +75,9 @@ const run = async () => {
 
   console.log("\n[member actions]");
   const login = await fetch(BASE + "/api/auth/login", { method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "林小满", password: "starisle-dev" }) });
+    body: JSON.stringify({ username: "演示管理员", password: "starisle-dev" }) });
   const cookie = login.headers.get("set-cookie")?.split(";")[0] ?? "";
-  ok("POST /api/auth/login (demo member)", login.status === 200 && cookie.includes("sid="));
+  ok("POST /api/auth/login (seeded demo admin)", login.status === 200 && cookie.includes("sid="));
   const authed = (path, opts = {}) => get(path, { ...opts, headers: { "content-type": "application/json", cookie, ...(opts.headers ?? {}) } });
 
   const dash = await authed("/api/my/dashboard");
