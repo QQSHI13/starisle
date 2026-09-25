@@ -62,7 +62,8 @@ bun src/server/node.ts        # :3000, auto-creates + seeds the SQLite file data
 **PostgreSQL (team deployments)** — set `DATABASE_URL` and the same server speaks Postgres:
 
 ```bash
-# e.g. docker run -d -e POSTGRES_DB=starisle -e POSTGRES_USER=starisle -e POSTGRES_PASSWORD=... -p 5432:5432 postgres:17-alpine
+# e.g. docker run -d -e POSTGRES_DB=starisle -e POSTGRES_USER=starisle -e POSTGRES_PASSWORD=... -p 5432:5432 postgres:18-alpine
+# (verified against PostgreSQL 17/18; any version >= 12 works — the app pins nothing)
 DATABASE_URL=postgres://starisle:pass@localhost:5432/starisle bun src/server/node.ts
 # first boot auto-applies src/db/schema.pg.sql + seed.sql
 ```
