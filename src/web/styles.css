@@ -223,7 +223,8 @@ footer.site .legal { margin-top: 52px; padding-top: 20px; border-top: 1px solid 
   border-radius: 50%; color: #f7f2e9; font-weight: 600;
   font-family: var(--sans); flex: none; line-height: 1; user-select: none;
 }
-.icon { vertical-align: -2px; flex: none; }
+.icon, svg.lucide { vertical-align: -2px; flex: none; }
+.card .meta svg.lucide { color: var(--gold); }
 .kv dt { display: flex; align-items: center; gap: 7px; }
 .card .meta .icon { color: var(--gold); }
 .mstone { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }

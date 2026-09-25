@@ -1,24 +1,23 @@
-const PATHS: Record<string, string> = {
-  star: "M12 2.2 14.3 9.7 21.8 12 14.3 14.3 12 21.8 9.7 14.3 2.2 12 9.7 9.7Z",
-  repo: "M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.58 9.58 0 0 1 5 0c1.91-1.3 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85V21c0 .27.18.58.69.48A10 10 0 0 0 12 2Z",
-  users: "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3Zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5Z",
-  clock: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3Z",
-  fork: "M12 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-7 6a2 2 0 1 0 0 4c.35 0 .68-.09.97-.24A6 6 0 0 0 11 15.9V19a2 2 0 1 0 2 0v-3.1a6 6 0 0 0 5.03-3.14c.29.15.62.24.97.24a2 2 0 1 0 0-4c-.35 0-.68.09-.97.24A6 6 0 0 0 13 11.9V9.07h.5a2 2 0 1 0 0-4h-3a2 2 0 1 0 0 4H11v2.83a6 6 0 0 0-5.03 3.14A1.98 1.98 0 0 0 5 9Z",
-  check: "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41Z",
-  circle: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z",
-  arrow: "M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z",
-  ext: "M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7ZM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7Z",
-  play: "M8 5v14l11-7Z",
-  link: "M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12ZM8 13h8v-2H8v2Zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10Z",
+import {
+  Star, Github, Users, Clock, GitFork, Check, Circle, ArrowRight,
+  ExternalLink, Play, Link2, type LucideIcon,
+} from "lucide-react";
+
+const MAP: Record<string, LucideIcon> = {
+  star: Star,
+  repo: Github,
+  users: Users,
+  clock: Clock,
+  fork: GitFork,
+  check: Check,
+  circle: Circle,
+  arrow: ArrowRight,
+  ext: ExternalLink,
+  play: Play,
+  link: Link2,
 };
 
-export function I({ name, size = 14 }: { name: keyof typeof PATHS | string; size?: number }) {
-  return (
-    <svg
-      className="icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"
-      fill="currentColor"
-    >
-      <path d={PATHS[name] ?? PATHS.star} />
-    </svg>
-  );
+export function I({ name, size = 14 }: { name: keyof typeof MAP | string; size?: number }) {
+  const Cmp = MAP[name] ?? Star;
+  return <Cmp size={size} strokeWidth={2} aria-hidden="true" />;
 }
