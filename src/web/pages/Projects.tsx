@@ -63,14 +63,14 @@ function ReportModal({ targetId }: { targetId: number }) {
   const [reason, setReason] = useState("");
   return (<>
     <button className="btn small danger" onClick={() => { if (!me) { location.href = "/login"; return; } setOpen(true); }}>
-      {lang === "zh" ? "举报此项目" : "Report"}</button>
+      <I name="flag" size={13} />{lang === "zh" ? "举报此项目" : "Report"}</button>
     <Modal open={open} onClose={() => setOpen(false)} title={lang === "zh" ? "举报此项目" : "Report project"}>
       <label className="field"><span>{lang === "zh" ? "原因（选填）" : "Reason (optional)"}</span>
         <textarea rows={3} value={reason} onChange={(e: any) => setReason(e.target.value)} autoFocus /></label>
       <button className="btn small danger" onClick={async () => {
         await api("/reports", { method: "POST", body: JSON.stringify({ target_type: "project", target_id: targetId, reason }) });
         toast(lang === "zh" ? "已提交举报，管理员会尽快处理" : "Report submitted"); setOpen(false); setReason("");
-      }}>{lang === "zh" ? "提交举报" : "Submit"}</button>
+      }}><I name="send" size={13} />{lang === "zh" ? "提交举报" : "Submit"}</button>
     </Modal>
   </>);
 }
@@ -96,7 +96,7 @@ export function ProjectDetail() {
         <h1 style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
           {p.name}
           {me && me.username === p.owner_username && !editing && (
-            <a className="btn small" href={`/projects/${p.slug}?edit=1`}>{t.edit} ↗</a>
+            <a className="btn small" href={`/projects/${p.slug}?edit=1`}><I name="pen" size={13} />{t.edit} ↗</a>
           )}
         </h1>
         {p.tagline && <p className="sub">{p.tagline}</p>}
@@ -160,7 +160,7 @@ export function ProjectDetail() {
             <button className="btn small" onClick={async () => {
               await api(`/projects/${slug}/follow`, { method: data.following ? "DELETE" : "POST" });
               toast(data.following ? "已取消关注" : "已关注"); setTimeout(() => location.reload(), 600);
-            }}>{data.following ? (lang === "zh" ? "已关注 ✓" : "Following ✓") : (lang === "zh" ? "关注这个项目" : "Follow")}</button>
+            }}><I name="heart" size={13} />{data.following ? (lang === "zh" ? "已关注 ✓" : "Following ✓") : (lang === "zh" ? "关注这个项目" : "Follow")}</button>
             <span className="dim" style={{ marginLeft: 10, fontSize: 13 }}>{data.followers} {lang === "zh" ? "人关注" : "followers"}</span>
           </p>
         )}
@@ -173,7 +173,7 @@ export function ProjectDetail() {
                 setMsg(""); location.reload(); }}>
                 <label className="field"><span>{lang === "zh" ? "发布进展" : "Post an update"}</span>
                   <Editor value={msg} onChange={setMsg} rows={2} /></label>
-                <button className="btn small primary">{lang === "zh" ? "发布" : "Post"}</button>
+                <button className="btn small primary"><I name="send" size={13} />{lang === "zh" ? "发布" : "Post"}</button>
               </form>
             ) : (
               <form onSubmit={async (e) => { e.preventDefault();
@@ -181,7 +181,7 @@ export function ProjectDetail() {
                 toast(lang === "zh" ? "加入申请已发送" : "Join request sent"); setMsg(""); }}>
                 <label className="field"><span>{t.join_project}</span>
                   <textarea rows={2} placeholder={lang === "zh" ? "给项目发起人留言（选填）" : "Message for the owner (optional)"} value={msg} onChange={(e: any) => setMsg(e.target.value)} /></label>
-                <button className="btn small primary">{t.join_project}</button>
+                <button className="btn small primary"><I name="spark" size={13} />{t.join_project}</button>
               </form>
             )}
           </div>
@@ -208,8 +208,8 @@ export function ProjectDetail() {
         <div className="stat-row"><span>{t.contributors}</span><b>{data.members.length}</b></div>
         <div className="stat-row"><span>{lang === "zh" ? "关注者" : "Followers"}</span><b>{data.followers}</b></div>
         <div className="stat-row"><span>{t.repo}</span><b style={{fontSize:13, wordBreak:"break-all"}}>{rs && !rs.error ? `${rs.stars} ★ / ${rs.forks} ⑂` : "—"}</b></div>
-        {p.repo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:14}} href={p.repo_url} target="_blank" rel="noreferrer">{lang === "zh" ? "查看开源仓库" : "View repository"} →</a>}
-        {p.demo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:8}} href={p.demo_url} target="_blank" rel="noreferrer">{t.demo} →</a>}
+        {p.repo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:14}} href={p.repo_url} target="_blank" rel="noreferrer"><I name="repo" size={13} />{lang === "zh" ? "查看开源仓库" : "View repository"} →</a>}
+        {p.demo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:8}} href={p.demo_url} target="_blank" rel="noreferrer"><I name="play" size={13} />{t.demo} →</a>}
       </aside>
       </div></div></section>
     </>

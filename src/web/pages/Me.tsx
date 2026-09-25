@@ -8,6 +8,7 @@ import { ProjectForm } from "./ProjectForm";
 import { Modal } from "../Modal";
 
 import { Avatar } from "../Avatar";
+import { I } from "../icons";
 
 export default function Me() {
   const { t } = useLang();
@@ -26,8 +27,8 @@ export default function Me() {
       <div className="page-head" style={{ padding: "0 0 28px" }}>
         <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 14 }}>
           <Avatar name={me.display_name} src={(me as any).avatar} size={52} /> {me.display_name}
-          {me.role === "admin" && <Link className="btn small primary" style={{ marginLeft: "auto" }} to="/admin">管理后台 →</Link>}
-          <button className="btn small" style={me.role === "admin" ? {} : { marginLeft: "auto" }} onClick={() => { logout(); location.href = "/"; }}>退出登录</button>
+          {me.role === "admin" && <Link className="btn small primary" style={{ marginLeft: "auto" }} to="/admin"><I name="arrow" size={13} /> 管理后台 →</Link>}
+          <button className="btn small" style={me.role === "admin" ? {} : { marginLeft: "auto" }} onClick={() => { logout(); location.href = "/"; }}><I name="logout" size={13} /> 退出登录</button>
         </h1>
         <p className="sub">@{me.username}{me.role === "admin" ? " · admin" : ""}</p>
       </div>
@@ -39,7 +40,7 @@ export default function Me() {
       <section style={{ padding: "0 0 36px" }}>
         <div className="block-head">
           <h2>{t.my_projects}</h2>
-          <button className="btn small" onClick={() => setShowNew(!showNew)}>{t.new_project}</button>
+          <button className="btn small" onClick={() => setShowNew(!showNew)}><I name="plus" size={13} /> {t.new_project}</button>
         </div>
         {showNew && <ProjectForm onDone={() => { setShowNew(false); location.reload(); }} />}
         {(proj?.projects ?? []).map((p) => (
@@ -51,7 +52,7 @@ export default function Me() {
                 <p className="dim" style={{ margin: "6px 0 0", fontSize: 13 }}>{p.tagline}</p>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <Link className="btn small" to={`/projects/${p.slug}?edit=1`}>{t.edit} →</Link>
+                <Link className="btn small" to={`/projects/${p.slug}?edit=1`}><I name="pen" size={13} /> {t.edit} →</Link>
               </div>
             </div>
                       </div>
@@ -70,7 +71,7 @@ export default function Me() {
       </section>
 
       <section style={{ padding: "0 0 36px" }}>
-        <div className="block-head"><h2>私信</h2><Link className="btn small" to="/dm">打开私信页 →</Link></div>
+        <div className="block-head"><h2>私信</h2><Link className="btn small" to="/dm"><I name="send" size={13} /> 打开私信页 →</Link></div>
         <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}><MiniDM /></div>
       </section>
       <HomeworkInbox />
@@ -124,7 +125,7 @@ function NotificationManager() {
       <div>
         <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
           <input type="text" placeholder="搜索消息…" value={q} onChange={(e: any) => setQ(e.target.value)} style={{ width: 220 }} aria-label="搜索消息" />
-          {unread > 0 && <button className="btn small" onClick={async () => { await api("/notifications/read", { method: "POST" }); refresh(); }}>{t.mark_all_read}</button>}
+          {unread > 0 && <button className="btn small" onClick={async () => { await api("/notifications/read", { method: "POST" }); refresh(); }}><I name="check" size={13} /> {t.mark_all_read}</button>}
         </div>
         {items.length === 0 && <p className="dim">{view === "inbox" ? "没有未读消息 — 全处理完了。" : view === "saved" ? "没有已保存的消息。" : "没有已完成的消息。"}</p>}
         {items.map((n) => (
@@ -134,9 +135,9 @@ function NotificationManager() {
             <span style={n.read ? { color: "var(--ink-3)" } : { fontWeight: 600 }}>{n.text}</span>
             <span className="bio">{n.created_at.slice(0, 16)}</span>
             <span style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-              {!n.read && <button className="btn small" title="完成" onClick={async () => { await api(`/notifications/${n.id}/read`, { method: "POST" }); refresh(); }}>✓</button>}
-              <button className="btn small" title={n.saved ? "取消保存" : "保存"} onClick={async () => { await api(`/notifications/${n.id}/save`, { method: "POST" }); refresh(); }}>{n.saved ? "★" : "☆"}</button>
-              <button className="btn small danger" onClick={async () => { await api(`/notifications/${n.id}`, { method: "DELETE" }); refresh(); }}>🗑</button>
+              {!n.read && <button className="btn small" title="完成" onClick={async () => { await api(`/notifications/${n.id}/read`, { method: "POST" }); refresh(); }}><I name="check" size={13} /> ✓</button>}
+              <button className="btn small" title={n.saved ? "取消保存" : "保存"} onClick={async () => { await api(`/notifications/${n.id}/save`, { method: "POST" }); refresh(); }}><I name="star" size={13} /> {n.saved ? "★" : "☆"}</button>
+              <button className="btn small danger" onClick={async () => { await api(`/notifications/${n.id}`, { method: "DELETE" }); refresh(); }}><I name="trash" size={13} /> 🗑</button>
             </span>
           </div>
         ))}
@@ -157,14 +158,14 @@ function HomeworkInbox() {
         <div className="member-row" key={h.id}>
           <span className="pill gold">待提交</span>
           <span className="bio" style={{ flex: 1 }}><b>{h.title}</b> · {h.course_title}（截止 {h.due_at?.slice(0, 10) ?? "—"}）</span>
-          <Link className="btn small" to={`/courses/${encodeURIComponent(h.course_slug ?? "")}`}>去课程页提交 →</Link>
+          <Link className="btn small" to={`/courses/${encodeURIComponent(h.course_slug ?? "")}`}><I name="arrow" size={13} /> 去课程页提交 →</Link>
         </div>
       ))}
       {mine.slice(0, 5).map((s: any) => (
         <div className="member-row" key={s.id}>
           <span className="pill">{s.status === "approved" ? "已通过" : s.status === "rejected" ? "需修改" : "待批改"}</span>
           <span className="bio" style={{ flex: 1 }}>{s.homework_title} · {s.course_title}{s.feedback ? ` · 反馈：${s.feedback}` : ""}</span>
-          <a className="btn small" href={s.repo_url} target="_blank" rel="noreferrer">查看提交</a>
+          <a className="btn small" href={s.repo_url} target="_blank" rel="noreferrer"><I name="eye" size={13} /> 查看提交</a>
         </div>
       ))}
     </section>
@@ -193,8 +194,8 @@ function JoinInbox() {
         <div className="member-row" key={r.id}>
           <span className="dname" style={{ fontSize: 15 }}>{r.requester_name}</span>
           <span className="bio">{r.name} — {r.message || "（无留言）"}</span>
-          <button className="btn small primary" onClick={() => decide(r.id, "approve")}>{t.approve}</button>{" "}
-          <button className="btn small danger" onClick={() => decide(r.id, "reject")}>{t.reject}</button>
+          <button className="btn small primary" onClick={() => decide(r.id, "approve")}><I name="check" size={13} /> {t.approve}</button>{" "}
+          <button className="btn small danger" onClick={() => decide(r.id, "reject")}><I name="ban" size={13} /> {t.reject}</button>
         </div>
       ))}
     </section>
@@ -226,7 +227,7 @@ function Deactivate() {
   const [show, setShow] = useState(false);
   return (
     <section style={{ padding: "0 0 36px", maxWidth: 480 }}>
-      <button className="btn small danger" onClick={() => setShow(!show)}>注销账号 · Deactivate account</button>
+      <button className="btn small danger" onClick={() => setShow(!show)}><I name="ban" size={13} /> 注销账号 · Deactivate account</button>
       {show && (
         <form onSubmit={async (e) => { e.preventDefault(); setMsg(null);
           try { await api("/me/deactivate", { method: "POST", body: JSON.stringify({ password: pw }) }); location.href = "/"; }
@@ -235,7 +236,7 @@ function Deactivate() {
           <p className="dim" style={{ fontSize: 13 }}>验证密码后账号将停用，个人资料会被清除。项目和历史记录按隐私政策保留。</p>
           <label className="field"><span>密码 · Password</span>
             <input type="password" required value={pw} onChange={(e: any) => setPw(e.target.value)} /></label>
-          <button className="btn small danger" type="submit">确认注销</button>
+          <button className="btn small danger" type="submit"><I name="ban" size={13} /> 确认注销</button>
         </form>
       )}
     </section>
@@ -267,8 +268,8 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: () => void }) {
           onChange={async (e: any) => { await api("/me", { method: "PUT", body: JSON.stringify({ real_name_public: e.target.checked }) }); onSaved(); }} />
         <span>公开我的真实姓名（{(me as any).is_minor ? "未成年人不可公开" : "默认不公开"}）· Make my real name public</span>
       </label>
-      <button className="btn" type="submit">{t.save}</button>
-      <button className="btn" type="button" style={{ marginLeft: 8 }} onClick={() => { setF(initial); setMsg(false); }}>{t.cancel}</button>
+      <button className="btn" type="submit"><I name="save" size={15} /> {t.save}</button>
+      <button className="btn" type="button" style={{ marginLeft: 8 }} onClick={() => { setF(initial); setMsg(false); }}><I name="x" size={15} /> {t.cancel}</button>
     </form>
   );
 }

@@ -5,6 +5,7 @@ import { useFetch } from "../hooks";
 import { api } from "../api";
 import { useMe } from "../App";
 import { Avatar } from "../Avatar";
+import { I } from "../icons";
 
 export default function DM() {
   const { lang } = useLang();
@@ -69,7 +70,7 @@ export default function DM() {
             </div>
             <form onSubmit={send} style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <input type="text" required placeholder={lang === "zh" ? "说点什么…（审核适用）" : "Say something…"} value={text} onChange={(e: any) => setText(e.target.value)} style={{ flex: 1 }} />
-              <button className="btn primary small">{lang === "zh" ? "发送" : "Send"}</button>
+              <button className="btn primary small"><I name="send" size={13} />{lang === "zh" ? "发送" : "Send"}</button>
             </form>
           </>
         )}

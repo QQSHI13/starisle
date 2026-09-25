@@ -444,3 +444,11 @@ header.site { box-shadow: 0 1px 0 var(--line); }
 .feed-subject:hover { text-decoration: underline; text-underline-offset: 2px; }
 .feed-text { display: block; color: var(--ink-3); font-size: 13px; margin-top: 3px; overflow-wrap: break-word; }
 .feed-time { white-space: nowrap; color: var(--ink-3); font-size: 12px; flex: none; }
+
+/* ---------- button icons ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.btn.small { gap: 5px; }
+.btn svg.lucide { flex: none; }
+.switch button { display: inline-flex; align-items: center; gap: 6px; }
+.switch a { display: inline-flex; align-items: center; gap: 6px; }
+a.card .meta svg.lucide { color: var(--gold); }

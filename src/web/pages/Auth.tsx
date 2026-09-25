@@ -3,13 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { useLang } from "../i18n";
 import { api } from "../api";
 import { useMe } from "../App";
+import { I } from "../icons";
 
 function AuthSwitch({ active }: { active: "login" | "apply" }) {
   const { t } = useLang();
   return (
     <div className="switch" role="tablist">
-      <Link to="/login" role="tab" aria-selected={active === "login"} className={active === "login" ? "active" : ""}>{t.login_title}</Link>
-      <Link to="/apply" role="tab" aria-selected={active === "apply"} className={active === "apply" ? "active" : ""}>{t.apply_title}</Link>
+      <Link to="/login" role="tab" aria-selected={active === "login"} className={active === "login" ? "active" : ""}><I name="arrow" size={13} />{t.login_title}</Link>
+      <Link to="/apply" role="tab" aria-selected={active === "apply"} className={active === "apply" ? "active" : ""}><I name="spark" size={13} />{t.apply_title}</Link>
     </div>
   );
 }
@@ -57,7 +58,7 @@ export function Apply() {
       {token ? (
         <>
           <div className="notice" role="status"><b>{t.apply_query}</b><br />{t.apply_token_hint}<br /><code>{token}</code></div>
-          <Link className="btn" to="/apply/query">{t.apply_query}</Link>
+          <Link className="btn" to="/apply/query"><I name="search" size={15} />{t.apply_query}</Link>
         </>
       ) : (
         <form onSubmit={submit}>
@@ -74,7 +75,7 @@ export function Apply() {
           <label className="field"><span>{zh ? "邮箱验证码" : "Email verification code"}</span>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="text" required inputMode="numeric" pattern="\d{6}" placeholder={zh ? "6 位验证码" : "6-digit code"} value={f.email_otp} onChange={set("email_otp")} style={{ flex: 1 }} />
-              <button type="button" className="btn" disabled={!f.email} onClick={sendOtp}>{zh ? "发送验证码" : "Send code"}</button>
+              <button type="button" className="btn" disabled={!f.email} onClick={sendOtp}><I name="send" size={15} />{zh ? "发送验证码" : "Send code"}</button>
             </div>
             {otpMsg && <span className="hint">{otpMsg}</span>}
           </label>
@@ -82,7 +83,7 @@ export function Apply() {
             <textarea rows={4} required minLength={10} value={f.statement} onChange={set("statement")} /></label>
           <label className="check"><input type="checkbox" checked={c1} onChange={(e: any) => setC1(e.target.checked)} required /><span>{t.consent_privacy}</span></label>
           <label className="check"><input type="checkbox" checked={c2} onChange={(e: any) => setC2(e.target.checked)} required /><span>{t.consent_public}</span></label>
-          <button className="btn primary" type="submit">{t.apply_submit}</button>
+          <button className="btn primary" type="submit"><I name="send" size={15} />{t.apply_submit}</button>
         </form>
       )}
     </div>
@@ -108,7 +109,7 @@ export function ApplyQuery() {
         {err && <div className="error-box" role="alert">{err}</div>}
         <Field label={t.username} type="text" required value={f.username} onChange={(e: any) => setF({ ...f, username: e.target.value })} autoComplete="username" />
         <Field label={t.password} type="password" required value={f.password} onChange={(e: any) => setF({ ...f, password: e.target.value })} autoComplete="current-password" />
-        <button className="btn primary" type="submit">{t.apply_query}</button>
+        <button className="btn primary" type="submit"><I name="search" size={15} />{t.apply_query}</button>
       </form>
       {result && (
         <div className="notice" role="status">
@@ -143,8 +144,8 @@ export function Login() {
         {err && <div className="error-box" role="alert">{err}</div>}
         <Field label={t.username} type="text" required autoComplete="username" value={f.username} onChange={(e: any) => setF({ ...f, username: e.target.value })} />
         <Field label={t.password} type="password" required autoComplete="current-password" value={f.password} onChange={(e: any) => setF({ ...f, password: e.target.value })} />
-        <button className="btn primary" type="submit">{t.login}</button>
-        <Link className="btn" style={{ marginLeft: 10 }} to="/account-recovery">{t.recovery}</Link>
+        <button className="btn primary" type="submit"><I name="arrow" size={15} />{t.login}</button>
+        <Link className="btn" style={{ marginLeft: 10 }} to="/account-recovery"><I name="shield" size={15} />{t.recovery}</Link>
       </form>
     </div>
   );
@@ -166,13 +167,13 @@ function EmailReset() {
           <button type="button" className="btn" onClick={async () => { setMsg(null);
             try { const d = await api("/auth/email-otp", { method: "POST", body: JSON.stringify({ email: f.email, purpose: "reset" }) });
               setMsg((lang === "zh" ? "验证码已发送" : "Code sent") + (d.dev ? `（开发模式：${d.dev}）` : ""));
-            } catch (e2: any) { setMsg(String(e2.message)); } }}>{lang === "zh" ? "发送验证码" : "Send code"}</button>
+            } catch (e2: any) { setMsg(String(e2.message)); } }}><I name="send" size={15} />{lang === "zh" ? "发送验证码" : "Send code"}</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <input type="text" required inputMode="numeric" placeholder={lang === "zh" ? "6 位验证码" : "6-digit code"} value={f.code} onChange={(e: any) => setF({ ...f, code: e.target.value })} />
           <input type="password" required minLength={8} maxLength={72} placeholder={lang === "zh" ? "新密码（8–72 位）" : "New password"} value={f.password} onChange={(e: any) => setF({ ...f, password: e.target.value })} />
         </div>
-        <button className="btn primary" style={{ marginTop: 10 }}>{lang === "zh" ? "重置密码" : "Reset password"}</button>
+        <button className="btn primary" style={{ marginTop: 10 }}><I name="refresh" size={15} />{lang === "zh" ? "重置密码" : "Reset password"}</button>
       </>)}
     </form>
   );
@@ -210,7 +211,7 @@ export function Recovery() {
           ) : (
             <div className="toolbar">
               <input type="password" placeholder={t.password} value={pw} onChange={(e: any) => setPw(e.target.value)} style={{ width: 220 }} />
-              <button className="btn" onClick={gen}>{t.gen_code}</button>
+              <button className="btn" onClick={gen}><I name="plus" size={15} />{t.gen_code}</button>
             </div>
           )}
         </>
@@ -222,7 +223,7 @@ export function Recovery() {
         <Field label={t.username} type="text" required value={f.username} onChange={(e: any) => setF({ ...f, username: e.target.value })} />
         <Field label={t.recovery} type="text" required value={f.code} onChange={(e: any) => setF({ ...f, code: e.target.value })} />
         <Field label={t.new_password} type="password" required minLength={8} maxLength={72} value={f.password} onChange={(e: any) => setF({ ...f, password: e.target.value })} />
-        <button className="btn primary" type="submit">{t.reset_password}</button>
+        <button className="btn primary" type="submit"><I name="refresh" size={15} />{t.reset_password}</button>
       </form>
       {ok && <div className="notice" role="status">OK</div>}
     </div>

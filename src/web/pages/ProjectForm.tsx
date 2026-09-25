@@ -3,6 +3,7 @@ import { useLang } from "../i18n";
 import { api } from "../api";
 import { useFetch } from "../hooks";
 import { Modal } from "../Modal";
+import { I } from "../icons";
 
 export function ProjectForm({ existing, onDone }: { existing?: any; onDone: () => void }) {
   const { t } = useLang();
@@ -48,14 +49,14 @@ export function ProjectForm({ existing, onDone }: { existing?: any; onDone: () =
           <option value="">—</option>
           {(domData?.domains ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select></label>
-      <button className="btn primary" type="submit">{t.save}</button>
-      <button className="btn" type="button" style={{ marginLeft: 8 }} onClick={onDone}>{t.cancel}</button>
-      {existing && <button className="btn danger" type="button" style={{ marginLeft: 8 }} onClick={() => setDelOpen(true)}>{t.delete}</button>}
+      <button className="btn primary" type="submit"><I name="save" size={15} />{t.save}</button>
+      <button className="btn" type="button" style={{ marginLeft: 8 }} onClick={onDone}><I name="x" size={15} />{t.cancel}</button>
+      {existing && <button className="btn danger" type="button" style={{ marginLeft: 8 }} onClick={() => setDelOpen(true)}><I name="trash" size={15} />{t.delete}</button>}
       <Modal open={delOpen} onClose={() => setDelOpen(false)} title={t.delete}>
         <p style={{ fontSize: 14.5, color: "var(--ink-2)", marginTop: 0 }}>{t.delete_project_warn}</p>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn small danger" onClick={del}>{t.confirm_delete}</button>
-          <button className="btn small" onClick={() => setDelOpen(false)}>{t.cancel}</button>
+          <button className="btn small danger" onClick={del}><I name="trash" size={13} />{t.confirm_delete}</button>
+          <button className="btn small" onClick={() => setDelOpen(false)}><I name="x" size={13} />{t.cancel}</button>
         </div>
       </Modal>
     </form>
@@ -78,8 +79,8 @@ function JoinInbox() {
         <div className="member-row" key={r.id}>
           <span className="dname" style={{ fontSize: 15 }}>{r.requester_name}</span>
           <span className="bio">{r.name} — {r.message || "（无留言）"}</span>
-          <button className="btn small primary" onClick={() => decide(r.id, "approve")}>{t.approve}</button>{" "}
-          <button className="btn small danger" onClick={() => decide(r.id, "reject")}>{t.reject}</button>
+          <button className="btn small primary" onClick={() => decide(r.id, "approve")}><I name="check" size={13} />{t.approve}</button>{" "}
+          <button className="btn small danger" onClick={() => decide(r.id, "reject")}><I name="ban" size={13} />{t.reject}</button>
         </div>
       ))}
     </section>

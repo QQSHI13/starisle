@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import { Md } from "./Md";
+import { I } from "./icons";
 
-const BTNS: [string, string, string][] = [
-  ["B", "**", "**"], ["I", "*", "*"], ["链接", "[标题](https://)", ""],
-  ["代码", "`", "`"], ["引用", "> ", ""], ["列表", "\n- 项目", ""], ["公式", "\n$$公式$$\n", ""], ["流程图", "\n```mermaid\nflowchart LR\n  A[开始] --> B[结束]\n```\n", ""],
+const BTNS: [string, string, string, string][] = [
+  ["B", "**", "**", "pen"], ["I", "*", "*", "pen"], ["链接", "[标题](https://)", "", "link"],
+  ["代码", "`", "`", "repo"], ["引用", "> ", "", "message"], ["列表", "\n- 项目", "", "file"], ["公式", "\n$$公式$$\n", "", "spark"], ["流程图", "\n```mermaid\nflowchart LR\n  A[开始] --> B[结束]\n```\n", "", "fork"],
 ];
 
 export function Editor({ value, onChange, rows = 8, placeholder, preview = true }: {
@@ -29,14 +30,14 @@ export function Editor({ value, onChange, rows = 8, placeholder, preview = true 
     <div className="editor">
       <div className="editor-bar">
         <div className="switch" style={{ marginBottom: 0, padding: 2 }}>
-          <button type="button" className={tab === "write" ? "active" : ""} onClick={() => setTab("write")}>编辑</button>
-          <button type="button" className={tab === "preview" ? "active" : ""} onClick={() => setTab("preview")} disabled={!preview}>预览</button>
+          <button type="button" className={tab === "write" ? "active" : ""} onClick={() => setTab("write")}><I name="pen" size={13} /> 编辑</button>
+          <button type="button" className={tab === "preview" ? "active" : ""} onClick={() => setTab("preview")} disabled={!preview}><I name="eye" size={13} /> 预览</button>
         </div>
         {tab === "write" && (
           <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {BTNS.map(([label, pre, post]) => (
+            {BTNS.map(([label, pre, post, icon]) => (
               <button key={label} type="button" className="btn small" style={{ padding: "3px 9px", fontSize: 12 }}
-                onClick={() => (post ? wrap(pre, post) : insert(pre))}>{label}</button>
+                onClick={() => (post ? wrap(pre, post) : insert(pre))}><I name={icon} size={13} /> {label}</button>
             ))}
           </span>
         )}

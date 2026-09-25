@@ -16,6 +16,7 @@ import Admin from "./pages/Admin";
 import DM from "./pages/DM";
 import Search from "./pages/Search";
 import Stream from "./pages/Stream";
+import { I } from "./icons";
 
 export type Member = {
   id: number; username: string; display_name: string; role: string;
@@ -131,7 +132,7 @@ function Layout({ children }: { children: ReactNode }) {
             {me ? (
               <UserMenu />
             ) : (
-              <Link className="btn small primary" to="/apply">{t.apply}</Link>
+              <Link className="btn small primary" to="/apply"><I name="spark" size={13} />{t.apply}</Link>
             )}
           </div>
         </div>
@@ -211,7 +212,7 @@ function NotFound() {
       <p className="kicker">404</p>
       <h1 className="serif" style={{ fontSize: 72, margin: "10px 0 16px" }}>∅</h1>
       <p className="sub">{t.not_found}</p>
-      <Link className="btn primary" to="/">{t.back_home}</Link>
+      <Link className="btn primary" to="/"><I name="home" size={15} />{t.back_home}</Link>
     </div>
   );
 }

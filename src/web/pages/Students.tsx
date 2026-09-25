@@ -5,6 +5,7 @@ import { Avatar } from "../Avatar";
 import { api } from "../api";
 import { useMe } from "../App";
 import { useState } from "react";
+import { I } from "../icons";
 
 export function Students() {
   const { t } = useLang();
@@ -60,7 +61,7 @@ export function Profile() {
             <button className="btn small" onClick={async () => {
               await api(`/members/${encodeURIComponent(m.username)}/follow`, { method: following ? "DELETE" : "POST" });
               setFollowing(!following);
-            }}>{following ? "已关注 ✓" : "关注"}</button>
+            }}><I name="heart" size={13} /> {following ? "已关注 ✓" : "关注"}</button>
           )}
             </h1>
             <div className="profile-stats">

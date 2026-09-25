@@ -117,7 +117,7 @@ function CommandCenter() {
       </div>
     ))}
     {section("folder", t.my_projects, dash.projects.length === 0 ? (
-      <div className="empty"><b>{zh ? "还没有项目" : "No projects yet"}</b>{zh ? "去项目广场看看同龄人在做什么，或从个人中心发起第一个项目。" : "Browse what others are building, or start your first project from your account page."}<br /><Link className="btn small" style={{ marginTop: 14 }} to="/projects">{zh ? "浏览项目" : "Browse projects"} →</Link></div>
+      <div className="empty"><b>{zh ? "还没有项目" : "No projects yet"}</b>{zh ? "去项目广场看看同龄人在做什么，或从个人中心发起第一个项目。" : "Browse what others are building, or start your first project from your account page."}<br /><Link className="btn small" style={{ marginTop: 14 }} to="/projects"><I name="arrow" size={13} /> {zh ? "浏览项目" : "Browse projects"} →</Link></div>
     ) : dash.projects.map((p: any) => (
       <div className="member-row" key={p.slug}><span className="dname" style={{ fontSize: 16 }}><Link to={`/projects/${p.slug}`}>{p.name}</Link></span>
         {p.status === "pending" && <span className="pill gold">{t.pending_review}</span>}<span className="bio">{p.tagline}</span></div>
@@ -127,8 +127,8 @@ function CommandCenter() {
     )))}
     {dash.join_requests.length > 0 && section("inbox", lang === "zh" ? "待处理的加入申请" : "Join requests", dash.join_requests.map((r: any) => (
       <div className="member-row" key={r.id}><span className="dname" style={{ fontSize: 15 }}>{r.requester_name}</span><span className="bio" style={{ flex: 1 }}>{r.name} — {r.message || "（无留言）"}</span>
-        <button className="btn small primary" onClick={async () => { await api(`/my/join-requests/${r.id}`, { method: "POST", body: JSON.stringify({ action: "approve" }) }); location.reload(); }}>{t.approve}</button>{" "}
-        <button className="btn small danger" onClick={async () => { await api(`/my/join-requests/${r.id}`, { method: "POST", body: JSON.stringify({ action: "reject" }) }); location.reload(); }}>{t.reject}</button></div>
+        <button className="btn small primary" onClick={async () => { await api(`/my/join-requests/${r.id}`, { method: "POST", body: JSON.stringify({ action: "approve" }) }); location.reload(); }}><I name="check" size={13} /> {t.approve}</button>{" "}
+        <button className="btn small danger" onClick={async () => { await api(`/my/join-requests/${r.id}`, { method: "POST", body: JSON.stringify({ action: "reject" }) }); location.reload(); }}><I name="ban" size={13} /> {t.reject}</button></div>
     )))}
   </>);
 }
@@ -163,8 +163,8 @@ export default function Home() {
               <h1>{t.hero_title_a}<br /><em>{t.hero_title_b}</em></h1>
               <p className="lede">{t.hero_body}</p>
               <div className="cta">
-                <Link className="btn primary" to="/projects">{t.hero_cta_projects}</Link>
-                <Link className="btn" to="/apply">{t.hero_cta_apply}</Link>
+                <Link className="btn primary" to="/projects"><I name="folder" size={15} /> {t.hero_cta_projects}</Link>
+                <Link className="btn" to="/apply"><I name="spark" size={15} /> {t.hero_cta_apply}</Link>
               </div>
               <div className="trust">
                 <span><Star />{t.trust_repo}</span>

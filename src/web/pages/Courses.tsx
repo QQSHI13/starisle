@@ -4,6 +4,7 @@ import { useLang } from "../i18n";
 import { useFetch } from "../hooks";
 import { api } from "../api";
 import { useMe } from "../App";
+import { I } from "../icons";
 
 export function Courses() {
   const { t } = useLang();
@@ -92,7 +93,7 @@ export function CourseDetail() {
                   {sub ? <span className="pill" style={{ marginTop: 4 }}>{sub.status === "approved" ? "已通过" : sub.status === "rejected" ? "需修改" : "待批改"}{sub.feedback ? ` · ${sub.feedback}` : ""}</span> : data!.enrolled ? (
                     <form onSubmit={async (e) => { e.preventDefault(); await api(`/my/homework/${h.id}/submit`, { method: "POST", body: JSON.stringify({ repo_url: repo }) }); setRepo(""); refresh(); location.reload(); }} style={{ marginTop: 6, display: "flex", gap: 6 }}>
                       <input type="text" required placeholder="提交仓库/作品链接" value={repo} onChange={(e: any) => setRepo(e.target.value)} style={{ width: 320 }} />
-                      <button className="btn small primary">提交</button>
+                      <button className="btn small primary"><I name="send" size={13} />提交</button>
                     </form>
                   ) : <span className="dim" style={{ fontSize: 12 }}>（报名开通后可提交）</span>}
                 </span>
@@ -100,7 +101,7 @@ export function CourseDetail() {
             );
           })}
         </>)}
-        {me && <button className="btn primary" onClick={apply} style={{ marginTop: 8 }}>{t.apply_course}</button>}
+        {me && <button className="btn primary" onClick={apply} style={{ marginTop: 8 }}><I name="spark" size={15} />{t.apply_course}</button>}
       </div></section>
     </>
   );

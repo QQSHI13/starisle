@@ -4,6 +4,7 @@ import { useFetch } from "../hooks";
 import { api } from "../api";
 import { useMe } from "../App";
 import { Avatar } from "../Avatar";
+import { I } from "../icons";
 
 export default function Mentors() {
   const { t } = useLang();
@@ -63,11 +64,11 @@ export default function Mentors() {
                       <input type="text" value={form.background} onChange={(e) => setForm({ ...form, background: e.target.value })} /></label>
                     <label className="field"><span>{t.your_questions}</span>
                       <textarea rows={2} value={form.questions} onChange={(e) => setForm({ ...form, questions: e.target.value })} /></label>
-                    <button className="btn primary small" onClick={() => submit(m.id)}>{t.submit}</button>
-                    <button className="btn small" style={{ marginLeft: 8 }} onClick={() => setOpenFor(null)}>×</button>
+                    <button className="btn primary small" onClick={() => submit(m.id)}><I name="send" size={13} />{t.submit}</button>
+                    <button className="btn small" style={{ marginLeft: 8 }} onClick={() => setOpenFor(null)}><I name="x" size={13} />×</button>
                   </div>
                 ) : (
-                  <button className="btn small" style={{ marginTop: "auto" }} onClick={() => setOpenFor(m.id)}>{t.request_mentor}</button>
+                  <button className="btn small" style={{ marginTop: "auto" }} onClick={() => setOpenFor(m.id)}><I name="spark" size={13} />{t.request_mentor}</button>
                 )
               )}
             </div>

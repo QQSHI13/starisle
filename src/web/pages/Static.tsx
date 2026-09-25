@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useMe } from "../App";
 import { useState } from "react";
 import { useToast } from "../toast";
+import { I } from "../icons";
 
 export function Activities() {
   const { t, lang } = useLang();
@@ -34,7 +35,7 @@ export function Activities() {
                 <h3>{a.title}</h3>
                 <p className="tagline">{a.description}</p>
                 <div className="meta"><span>{a.starts_at}</span>{a.location && <span>{a.location}</span>}
-                  {me && <button className="btn small" onClick={() => rsvp(a.id)}>{lang === "zh" ? "报名" : "RSVP"} · {counts[a.id] ?? "?"}</button>}
+                  {me && <button className="btn small" onClick={() => rsvp(a.id)}><I name="calendar" size={13} /> {lang === "zh" ? "报名" : "RSVP"} · {counts[a.id] ?? "?"}</button>}
                 </div>
               </div>
             ))}
