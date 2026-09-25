@@ -717,6 +717,30 @@ app.delete("/api/admin/columns/:id", async (c) => {
 
 const isStaff = (m: any): boolean => !!m && (m.role === "admin" || m.role === "teacher");
 
+app.get("/api/my/dashboard", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const projects = (await c.env.DB.prepare(`SELECT slug, name, tagline, status FROM projects WHERE owner_id = ? ORDER BY updated_at DESC`).bind(m.id).all()).results;
+  const notifications = (await c.env.DB.prepare(`SELECT id, text, type, read, created_at FROM notifications WHERE member_id = ? ORDER BY created_at DESC LIMIT 20`).bind(m.id).all()).results;
+  const homework = await (async () => {
+    const pending = (await c.env.DB.prepare(
+      `SELECT h.id, h.title, h.due_at, c.title AS course_title FROM homework h JOIN course_lessons l ON l.id = h.lesson_id JOIN courses c ON c.id = l.course_id
+       JOIN enrollments e ON e.course_id = c.id AND e.member_id = ? AND e.status = 'approved'
+       WHERE h.id NOT IN (SELECT homework_id FROM submissions WHERE member_id = ?) ORDER BY h.due_at`).bind(m.id, m.id).all()).results;
+    return { pending };
+  })();
+  const join_requests = (await c.env.DB.prepare(
+    `SELECT j.id, j.message, r.display_name AS requester_name, p.name, p.slug FROM join_requests j
+     JOIN projects p ON p.id = j.project_id JOIN members r ON r.id = j.member_id
+     WHERE p.owner_id = ? AND j.status = 'pending'`).bind(m.id).all()).results;
+  const followed_updates = (await c.env.DB.prepare(
+    `SELECT u.text, u.created_at, m.display_name AS author, p.name, p.slug FROM project_follows f
+     JOIN project_updates u ON u.project_id = f.project_id AND u.status = 'approved'
+     JOIN projects p ON p.id = f.project_id JOIN members m ON m.id = u.author_id
+     WHERE f.member_id = ? ORDER BY u.created_at DESC LIMIT 6`).bind(m.id).all()).results;
+  return c.json({ projects, notifications, homework, join_requests, followed_updates });
+});
+
 // ---------- DM (allowed only if at least one side is teacher/admin) ----------
 app.get("/api/dm", async (c) => {
   const m = await currentUser(c);

@@ -368,3 +368,6 @@ input, textarea, select { transition: border-color .15s ease, box-shadow .15s ea
 input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px var(--gold-soft); }
 
 @media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .aside-card { position: static; } }
+
+.masthead { display: flex; justify-content: space-between; border-bottom: 3px double var(--line-strong); padding-bottom: 10px; font-size: 12px; letter-spacing: 0.22em; color: var(--ink-3); text-transform: uppercase; }
+h2 .lucide { color: var(--gold); }

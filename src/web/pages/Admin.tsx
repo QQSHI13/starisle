@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { MdToolbar } from "../MdToolbar";
+import { I } from "../icons";
 import { Md } from "../Md";
 import { useLang } from "../i18n";
 import { api } from "../api";
@@ -126,7 +127,7 @@ function UpdatesQueue() {
   if (items.length === 0) return null;
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>动态审核 · Update review</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="file" size={17} /> 动态审核 · Update review</h3>
       {items.map((u: any) => (
         <div className="member-row" key={u.id}>
           <span className="bio" style={{ flex: 1 }}><b>{u.author}</b> @ {u.project_name}:{u.text}</span>
@@ -145,7 +146,7 @@ function ReportsQueue() {
   const decide = async (id: number, action: string) => { await api(`/admin/reports/${id}`, { method: "POST", body: JSON.stringify({ action }) }); setTick((x) => x + 1); };
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>举报队列 · Reports</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="shield" size={17} /> 举报队列 · Reports</h3>
       {items.length === 0 && <p className="dim">没有待处理的举报。</p>}
       {items.map((r: any) => (
         <div className="member-row" key={r.id}>
@@ -185,7 +186,7 @@ function MembersAdmin() {
   const verify = async (id: number) => { await api(`/admin/members/${id}/verify`, { method: "POST", body: "{}" }); setTick((x) => x + 1); };
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>成员管理 · Members (admin view — real names visible)</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="shield" size={17} /> 成员管理 · Members</h3>
       <div className="toolbar"><input type="text" placeholder="搜索真实姓名 / 网名 / 邮箱…" value={q} onChange={(e: any) => setQ(e.target.value)} style={{ width: 280 }} /></div>
       <table className="list">
         <thead><tr><th>真实姓名</th><th>网名</th><th>邮箱</th><th>项目</th><th>标记</th><th></th></tr></thead>
@@ -225,7 +226,7 @@ function CommentsQueue() {
   if (items.length === 0) return null;
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>评论审核 · Comments ({items.length})</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="message" size={17} /> 评论审核 · Comments ({items.length})</h3>
       {items.map((cm: any) => (
         <div className="member-row" key={cm.id}>
           <span className="bio" style={{ flex: 1 }}><b>{cm.author}</b> 在《{cm.column_title}》:{cm.text}</span>
@@ -301,7 +302,7 @@ function MentorQueue() {
   };
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>指导申请 · Mentor requests</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="cap" size={17} /> 指导申请 · Mentor requests</h3>
       {reqs.length === 0 && <p className="dim">{t.no_items}</p>}
       {reqs.map((r: any) => (
         <div className="member-row" key={r.id}>
@@ -327,7 +328,7 @@ function CourseTools() {
   void lessons;
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>课程与作业 · Courses & homework</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="book" size={17} /> 课程与作业 · Courses & homework</h3>
       {msg && <div className="notice" role="status">{msg}</div>}
       <div className="toolbar">
         <select value={courseSlug} onChange={(e: any) => setCourseSlug(e.target.value)} style={{ width: "auto" }}>
@@ -388,7 +389,7 @@ function GradingQueue() {
   if (items.length === 0) return null;
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>作业批改 · Grading ({items.length})</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="check" size={17} /> 作业批改 · Grading ({items.length})</h3>
       {items.map((s: any) => (
         <div className="member-row" key={s.id}>
           <span className="dname" style={{ fontSize: 15 }}>{s.display_name}{s.username ? `(${s.username})` : ""}</span>
@@ -425,7 +426,7 @@ function AdminTools() {
   const [ann, setAnn] = useState("");
   return (
     <section style={{ padding: "0 0 28px" }}>
-      <h3>站点运营 · Site operations</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="spark" size={17} /> 站点运营 · Site operations</h3>
       {msg && <div className="notice" role="status">{msg}</div>}
       <form onSubmit={post("/admin/activities", { title: aTitle, description: aDesc, starts_at: aWhen }, "活动已发布", () => { setATitle(""); setADesc(""); setAWhen(""); })} style={{ marginBottom: 22 }}>
         <b>发布活动</b>
