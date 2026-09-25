@@ -28,11 +28,14 @@ marked.use({
   },
 } as any);
 
-// Lazy loaders — heavy libraries load from CDN only when content needs them.
+// Lazy loaders — heavy libraries load from local vendor files, falling back to CDNs.
+// Root-relative paths are expanded to full origin URLs so Vite's dev import-analysis
+// leaves them alone (importing /public files from source triggers a dev-server error).
 const CDN = ["https://cdn.jsdelivr.net/npm", "https://unpkg.com", "https://cdnjs.cloudflare.com/ajax"];
+const abs = (p: string) => (p.startsWith("/") ? location.origin + p : p);
 const tryImport = async (paths: string[]) => {
   for (const p of paths) {
-    const url = p.startsWith("http") || p.startsWith("/") ? p : `${CDN[0]}/${p}`;
+    const url = p.startsWith("http") ? p : p.startsWith("/") ? abs(p) : `${CDN[0]}/${p}`;
     try { return await import(/* @vite-ignore */ url); } catch { /* try next CDN form */ }
   }
   for (const base of CDN) {
@@ -130,12 +133,20 @@ export function Md({ text }: { text: string }) {
   }, [ready, text]);
 
   const html = (() => {
-    let t = escapeHtml(text);
-    if (hasMath) {
-      t = t.replace(/\$\$([^$]+)\$\$/g, (_, m) => `<div class="math-block">${m}</div>`);
-      t = t.replace(/\$([^$\n]+)\$/g, (_, m) => `<span class="math-inline">${m}</span>`);
-    }
-    return marked.parse(t, { async: false, gfm: true, breaks: true }) as string;
+    const stash: string[] = [];
+    const held = hasMath
+      ? text
+          .replace(/\$\$([^$]+)\$\$/g, (_, m) => {
+            stash.push(`<div class="math-block">${escapeHtml(m)}</div>`);
+            return `\n\nZXMATHX${stash.length - 1}XZ\n\n`;
+          })
+          .replace(/\$([^$\n]+)\$/g, (_, m) => {
+            stash.push(`<span class="math-inline">${escapeHtml(m)}</span>`);
+            return `ZXMATHX${stash.length - 1}XZ`;
+          })
+      : text;
+    const out = marked.parse(held, { async: false, gfm: true, breaks: true }) as string;
+    return stash.length ? out.replace(/ZXMATHX(\d+)XZ/g, (_, i) => stash[Number(i)]) : out;
   })();
 
   return <div className="md" ref={ref} dangerouslySetInnerHTML={{ __html: html }} />;
