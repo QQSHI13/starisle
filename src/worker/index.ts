@@ -808,17 +808,31 @@ async function notifyMentions(DB: D1Database, text: string, source: string, acto
 app.get("/api/search", async (c) => {
   const q = (c.req.query("q") ?? "").trim().slice(0, 80);
   if (!q) return c.json({ results: [] });
-  const like = `%${q}%`;
-  const projects = await c.env.DB.prepare(`SELECT slug, name, tagline FROM projects WHERE status='approved' AND (name LIKE ? OR tagline LIKE ? OR body LIKE ?) LIMIT 8`).bind(like, like, like).all();
-  const columns = await c.env.DB.prepare(`SELECT slug, title, subtitle, topics, kind FROM columns WHERE title LIKE ? OR text LIKE ? OR topics LIKE ? LIMIT 8`).bind(like, like, like).all();
-  const members = await c.env.DB.prepare(`SELECT id, display_name, bio FROM members WHERE status='active' AND (display_name LIKE ? OR bio LIKE ?) LIMIT 8`).bind(like, like).all();
-  const local = { projects: projects.results, columns: columns.results, members: members.results };
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const clause = (col: string) => tokens.map(() => `${col} LIKE ?`).join(" AND ");
+  const args = (col: string) => tokens.map((t) => `%${t}%`);
+  const rank = (t: string) => tokens.map(() => `CASE WHEN ${t} LIKE ? THEN 1 ELSE 0 END`).join("+");
+  const rankArgs = tokens.map((t) => `${t}%`);
+  const projects = await c.env.DB.prepare(
+    `SELECT slug, name, tagline FROM projects WHERE status='approved' AND (${clause("name")} OR ${clause("tagline")} OR ${clause("body")})
+     ORDER BY ${rank("name")}+${rank("tagline")} DESC LIMIT 10`).bind(...args("name"), ...args("tagline"), ...args("body"), ...rankArgs, ...rankArgs).all();
+  const columns = await c.env.DB.prepare(
+    `SELECT slug, title, subtitle, topics, kind FROM columns WHERE ${clause("title")} OR ${clause("text")} OR ${clause("topics")}
+     ORDER BY ${rank("title")} DESC LIMIT 10`).bind(...args("title"), ...args("text"), ...args("topics"), ...rankArgs).all();
+  const members = await c.env.DB.prepare(
+    `SELECT id, display_name, bio FROM members WHERE status='active' AND (${clause("display_name")} OR ${clause("bio")})
+     ORDER BY ${rank("display_name")} DESC LIMIT 10`).bind(...args("display_name"), ...args("bio"), ...rankArgs).all();
+  const updates = await c.env.DB.prepare(
+    `SELECT u.text, u.created_at, p.slug AS project_slug, p.name AS project_name FROM project_updates u
+     JOIN projects p ON p.id = u.project_id WHERE u.status='approved' AND ${clause("u.text")}
+     ORDER BY u.created_at DESC LIMIT 5`).bind(...args("u.text")).all();
+  const local = { projects: projects.results, columns: columns.results, members: members.results, updates: updates.results };
   const searchUrl = process_env.SEARCH_URL;
   if (searchUrl) {
     try {
       const r = await fetch(`${searchUrl}?q=${encodeURIComponent(q)}`);
       if (r.ok) return c.json({ ...((await r.json()) as any), local });
-    } catch { /* fall through to local */ }
+    } catch { /* local fallback */ }
   }
   return c.json(local);
 });
