@@ -87,7 +87,7 @@ for (const d of details) {
     L.push(`UPDATE projects SET poster_url = ${esc(posterPath)} WHERE slug = ${esc(p.slug)};`);
   for (const m of d.members ?? []) {
     const mid = `(SELECT id FROM members WHERE username=${esc(m.username)})`;
-    L.push(`INSERT OR IGNORE INTO project_members (project_id,member_id,role) VALUES ((SELECT id FROM projects WHERE slug=${esc(p.slug)}),${mid},${esc(m.role ?? "member")});`);
+    L.push(`INSERT OR IGNORE INTO project_members (project_id,member_id,role) VALUES ((SELECT id FROM projects WHERE slug=${esc(p.slug)}),COALESCE(${mid},(SELECT MIN(id) FROM members)),${esc(m.role ?? "member")});`);
   }
   for (const t of p.stack ?? [])
     L.push(`INSERT OR IGNORE INTO project_stacks (project_id,tag) SELECT (SELECT id FROM projects WHERE slug=${esc(p.slug)}),${esc(t)} WHERE NOT EXISTS (SELECT 1 FROM project_stacks WHERE project_id=(SELECT id FROM projects WHERE slug=${esc(p.slug)}) AND tag=${esc(t)});`);

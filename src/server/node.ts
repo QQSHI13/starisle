@@ -10,9 +10,12 @@ const DIST = join(ROOT, "dist");
 const PORT = Number(process.env.PORT || 3000);
 const SECURE = process.env.COOKIE_SECURE !== "0";
 
+const USE_PG = !!process.env.DATABASE_URL;
+
 type DBClass = new (path: string) => any;
 let DatabaseSync: DBClass;
-{
+let sqlite: any = null;
+if (!USE_PG) {
   const ns: any = await import("node:sqlite").catch(() => null as any);
   if (ns?.DatabaseSync) DatabaseSync = ns.DatabaseSync;
   else {
@@ -20,21 +23,20 @@ let DatabaseSync: DBClass;
     if (!bun?.Database) throw new Error("need Node >= 22.13 or Bun");
     DatabaseSync = bun.Database;
   }
-}
-mkdirSync(join(ROOT, "data"), { recursive: true });
-const sqlite = new DatabaseSync(DB_PATH);
-sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
-
-const { n } = sqlite.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='members'").get() as any;
-if (!n) {
-  console.log("empty database, applying schema + seed…");
-  sqlite.exec(readFileSync(join(ROOT, "src/db/schema.sql"), "utf8"));
-  sqlite.exec(readFileSync(join(ROOT, "src/db/seed.sql"), "utf8"));
-  console.log("seeded.");
+  mkdirSync(join(ROOT, "data"), { recursive: true });
+  sqlite = new DatabaseSync(DB_PATH);
+  sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+  const { n } = sqlite.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='members'").get() as any;
+  if (!n) {
+    console.log("empty database, applying schema + seed…");
+    sqlite.exec(readFileSync(join(ROOT, "src/db/schema.sql"), "utf8"));
+    sqlite.exec(readFileSync(join(ROOT, "src/db/seed.sql"), "utf8"));
+    console.log("seeded.");
+  }
 }
 
 // D1-compatible shim over node:sqlite / bun:sqlite
-const DB = {
+const sqliteDB = {
   prepare(sql: string) {
     const stmt = sqlite.prepare(sql);
     const mk = (args: any[]) => ({
@@ -63,6 +65,31 @@ const DB = {
 };
 
 const { default: app } = await import("../worker/index.ts");
+
+// PostgreSQL path
+let DB: any = sqliteDB;
+if (USE_PG) {
+  const { makePgDb, translate } = await import("./pg.ts");
+  DB = makePgDb();
+  const pool = DB._pool as import("pg").Pool;
+  const { rows } = await pool.query("SELECT to_regclass('public.members') AS t");
+  if (!rows[0]?.t) {
+    console.log("postgres: applying schema.pg.sql + seed…");
+    const runFile = async (file: string) => {
+      const text = readFileSync(join(ROOT, file), "utf8");
+      const stmts = text.split(/;\s*\n/)
+        .map((x) => x.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").trim())
+        .filter((x) => x.length > 3);
+      for (const st of stmts) {
+        try { await pool.query(translate(st)); }
+        catch (e) { console.error("PG statement failed:", st.slice(0, 140)); throw e; }
+      }
+    };
+    await runFile("src/db/schema.pg.sql");
+    await runFile("src/db/seed.sql");
+    console.log("postgres seeded.");
+  }
+}
 
 // --- short-TTL cache for hot public GET endpoints ---
 const CACHEABLE = ["/api/stats", "/api/projects", "/api/courses", "/api/members", "/api/mentors", "/api/columns", "/api/partners", "/api/domains" ];

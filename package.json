@@ -17,6 +17,7 @@
     "hono": "^4.13.8",
     "lucide-react": "^1.48.0",
     "marked": "^18.0.14",
+    "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4"

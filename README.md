@@ -56,8 +56,18 @@ Admin: `演示管理员` (dashboard at `/admin`). Imported members keep their re
 
 ```bash
 bun install && bun run build
-bun src/server/node.ts        # :3000, auto-creates + seeds the DB
+bun src/server/node.ts        # :3000, auto-creates + seeds the SQLite file data/starisle.db
 ```
+
+**PostgreSQL (team deployments)** — set `DATABASE_URL` and the same server speaks Postgres:
+
+```bash
+# e.g. docker run -d -e POSTGRES_DB=starisle -e POSTGRES_USER=starisle -e POSTGRES_PASSWORD=... -p 5432:5432 postgres:17-alpine
+DATABASE_URL=postgres://starisle:pass@localhost:5432/starisle bun src/server/node.ts
+# first boot auto-applies src/db/schema.pg.sql + seed.sql
+```
+
+One codebase, one SQL dialect family: SQLite file by default (zero config), Cloudflare D1 via wrangler, or full PostgreSQL via `DATABASE_URL`. Without `DATABASE_URL` nothing changes — the file DB is still the demo default. (`bun run seed:demo` storyline is SQLite-only for now.)
 
 Behind nginx (`proxy_pass http://127.0.0.1:3000`) with a systemd unit (`Restart=always`). Backups = copy `data/starisle.db` (add a daily cron).
 
