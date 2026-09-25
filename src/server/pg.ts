@@ -30,8 +30,7 @@ function translate(sql: string): string {
     .replace(/char\(10\)/g, "chr(10)")
     .replace(/datetime\(REPLACE\(REPLACE\(p\.updated_at,'T',' '\),'Z',''\)\)/g, "p.updated_at")
     .replace(/datetime\(REPLACE\(REPLACE\(([^)]+)\)\)\)/g, "$1")
-    .replace(/strftime\('%Y-%m-%d %H:%M:%S','now'\)/g, "to_char(now(),'YYYY-MM-DD HH24:MI:SS')")
-    .replace(/1 - read/g, "1 - read");
+    .replace(/strftime\('%Y-%m-%d %H:%M:%S','now'\)/g, "to_char(now(),'YYYY-MM-DD HH24:MI:SS')");
   // INSERT OR IGNORE -> INSERT ... ON CONFLICT DO NOTHING (appended before any trailing semicolon)
   const m = out.match(/^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+/i);
   if (m) {

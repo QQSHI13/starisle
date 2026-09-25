@@ -62,7 +62,7 @@ function ReportModal({ targetId }: { targetId: number }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   return (<>
-    <button className="btn small danger" style={{ width: "100%", marginTop: 8 }} onClick={() => { if (!me) { location.href = "/login"; return; } setOpen(true); }}>
+    <button className="btn small danger" onClick={() => { if (!me) { location.href = "/login"; return; } setOpen(true); }}>
       {lang === "zh" ? "举报此项目" : "Report"}</button>
     <Modal open={open} onClose={() => setOpen(false)} title={lang === "zh" ? "举报此项目" : "Report project"}>
       <label className="field"><span>{lang === "zh" ? "原因（选填）" : "Reason (optional)"}</span>
@@ -186,14 +186,9 @@ export function ProjectDetail() {
             )}
           </div>
         )}
-        <p style={{ marginTop: 20 }}>
-          <button className="btn small danger" onClick={async () => {
-            if (!me) { location.href = "/login"; return; }
-            const reason = prompt(lang === "zh" ? "举报原因（选填）" : "Reason (optional)") ?? "";
-            await api("/reports", { method: "POST", body: JSON.stringify({ target_type: "project", target_id: data.project.id, reason }) });
-            alert(lang === "zh" ? "已提交举报，管理员会尽快处理。" : "Report submitted.");
-          }}>{lang === "zh" ? "举报此项目" : "Report"}</button>
-        </p>
+        <div style={{ marginTop: 20 }}>
+          <ReportModal targetId={data.project.id} />
+        </div>
         {data.updates.length > 0 && (
           <>
             <h3>{lang === "zh" ? "项目动态" : "Updates"}</h3>
@@ -215,18 +210,6 @@ export function ProjectDetail() {
         <div className="stat-row"><span>{t.repo}</span><b style={{fontSize:13, wordBreak:"break-all"}}>{rs && !rs.error ? `${rs.stars} ★ / ${rs.forks} ⑂` : "—"}</b></div>
         {p.repo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:14}} href={p.repo_url} target="_blank" rel="noreferrer">{lang === "zh" ? "查看开源仓库" : "View repository"} →</a>}
         {p.demo_url && <a className="btn small" style={{width:"100%", textAlign:"center", marginTop:8}} href={p.demo_url} target="_blank" rel="noreferrer">{t.demo} →</a>}
-        {me && me.username !== p.owner_username && (
-          <button className="btn small primary" style={{width:"100%", marginTop:8}} onClick={async () => {
-            await api(`/projects/${slug}/follow`, { method: data.following ? "DELETE" : "POST" });
-            toast(data.following ? "已取消关注" : "已关注"); setTimeout(() => location.reload(), 600);
-          }}>{data.following ? (lang === "zh" ? "已关注 ✓" : "Following ✓") : (lang === "zh" ? "关注这个项目" : "Follow")}</button>
-        )}
-        <button className="btn small danger" style={{width:"100%", marginTop:8}} onClick={async () => {
-          if (!me) { location.href = "/login"; return; }
-          const reason = prompt(lang === "zh" ? "举报原因（选填）" : "Reason (optional)") ?? "";
-          await api("/reports", { method: "POST", body: JSON.stringify({ target_type: "project", target_id: data.project.id, reason }) });
-          toast(lang === "zh" ? "已提交举报" : "Report submitted");
-        }}>{lang === "zh" ? "举报此项目" : "Report"}</button>
       </aside>
       </div></div></section>
     </>

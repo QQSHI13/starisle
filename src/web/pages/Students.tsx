@@ -25,7 +25,7 @@ export function Students() {
           <input type="text" placeholder="搜索成员…" value={q} onChange={(e: any) => setQ(e.target.value)} style={{ width: 260 }} aria-label="搜索成员" />
         </div>
         {members.map((m) => (
-          <div className="member-row" key={m.username}>
+          <div className="member-row" key={m.id ?? m.username}>
             <Avatar name={m.display_name || m.username} src={m.avatar} />
             <span className="dname">{m.display_name}</span>
             {m.username && <span className="uname">@{m.username}</span>}{!!m.verified && <span className="pill gold" style={{ marginLeft: 4 }}>已认证</span>}

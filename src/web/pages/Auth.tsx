@@ -25,11 +25,20 @@ function Field({ label, hint, ...props }: any) {
 }
 
 export function Apply() {
-  const { t } = useLang();
-  const [f, setF] = useState({ username: "", password: "", display_name: "", email: "", statement: "", age: "", guardian_name: "", guardian_contact: "" });
+  const { t, lang } = useLang();
+  const zh = lang === "zh";
+  const [f, setF] = useState({ username: "", password: "", display_name: "", email: "", statement: "", age: "", guardian_name: "", guardian_contact: "", email_otp: "" });
   const [c1, setC1] = useState(false);
   const [otpMsg, setOtpMsg] = useState<string | null>(null);
   const [c2, setC2] = useState(false);
+  const under14 = Number(f.age) > 0 && Number(f.age) < 14;
+  const sendOtp = async () => {
+    setOtpMsg(null); setErr(null);
+    try {
+      const d = await api("/auth/email-otp", { method: "POST", body: JSON.stringify({ email: f.email, purpose: "register" }) });
+      setOtpMsg((zh ? "验证码已发送" : "Code sent") + (d.dev ? `（开发模式：${d.dev}）` : ""));
+    } catch (e: any) { setOtpMsg(String(e.message)); }
+  };
   const [token, setToken] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value });
@@ -57,6 +66,18 @@ export function Apply() {
           <Field label={t.password} type="password" required minLength={8} maxLength={72} value={f.password} onChange={set("password")} autoComplete="new-password" />
           <Field label={t.display_name} hint={t.display_name_hint} type="text" required value={f.display_name} onChange={set("display_name")} />
           <Field label={t.email} type="email" required value={f.email} onChange={set("email")} />
+          <Field label={zh ? "年龄" : "Age"} hint={zh ? "加入星屿需年满 8 岁；未满 18 岁将启用未成年人保护设置" : "You must be at least 8; under-18s get minors-first protections"} type="number" required min={8} max={100} value={f.age} onChange={set("age")} />
+          {under14 && (<>
+            <Field label={zh ? "监护人姓名" : "Guardian name"} type="text" required value={f.guardian_name} onChange={set("guardian_name")} />
+            <Field label={zh ? "监护人联系方式" : "Guardian contact"} hint={zh ? "仅用于人工核验，不会公开" : "Used for human verification only, never public"} type="text" required value={f.guardian_contact} onChange={set("guardian_contact")} />
+          </>)}
+          <label className="field"><span>{zh ? "邮箱验证码" : "Email verification code"}</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" required inputMode="numeric" pattern="\d{6}" placeholder={zh ? "6 位验证码" : "6-digit code"} value={f.email_otp} onChange={set("email_otp")} style={{ flex: 1 }} />
+              <button type="button" className="btn" disabled={!f.email} onClick={sendOtp}>{zh ? "发送验证码" : "Send code"}</button>
+            </div>
+            {otpMsg && <span className="hint">{otpMsg}</span>}
+          </label>
           <label className="field"><span>{t.statement}</span>
             <textarea rows={4} required minLength={10} value={f.statement} onChange={set("statement")} /></label>
           <label className="check"><input type="checkbox" checked={c1} onChange={(e: any) => setC1(e.target.checked)} required /><span>{t.consent_privacy}</span></label>

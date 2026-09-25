@@ -42,6 +42,16 @@ async function hashPassword(password: string, salt: string): Promise<string> {
 }
 
 const newToken = () => crypto.randomUUID() + crypto.randomUUID();
+const randDigits = (n: number) => {
+  const bytes = new Uint8Array(n);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b % 10).join("");
+};
+const randSuffix = (n: number) => {
+  const bytes = new Uint8Array(n);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => (b % 36).toString(36)).join("");
+};
 
 // naive dev rate limiter
 const hits = new Map<string, { n: number; t: number }>();
@@ -364,13 +374,13 @@ app.get("/api/my/homework", async (c) => {
   const m = await currentUser(c);
   if (!m) return err(c, 401, "not logged in");
   const pending = await c.env.DB.prepare(
-    `SELECT h.id, h.title, h.instructions, h.due_at, l.title AS lesson_title, c.title AS course_title
+    `SELECT h.id, h.title, h.instructions, h.due_at, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug
      FROM homework h JOIN course_lessons l ON l.id = h.lesson_id JOIN courses c ON c.id = l.course_id
      JOIN enrollments e ON e.course_id = c.id AND e.member_id = ? AND e.status = 'approved'
      WHERE h.id NOT IN (SELECT homework_id FROM submissions WHERE member_id = ?)
      ORDER BY h.due_at`).bind(m.id, m.id).all();
   const mine = await c.env.DB.prepare(
-    `SELECT s.*, h.title AS homework_title, h.due_at, l.title AS lesson_title, c.title AS course_title
+    `SELECT s.*, h.title AS homework_title, h.due_at, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug
      FROM submissions s JOIN homework h ON h.id = s.homework_id JOIN course_lessons l ON l.id = h.lesson_id
      JOIN courses c ON c.id = l.course_id WHERE s.member_id = ? ORDER BY s.created_at DESC`).bind(m.id).all();
   return c.json({ pending: pending.results, mine: mine.results });
@@ -1009,7 +1019,7 @@ app.post("/api/auth/email-otp", async (c) => {
   const email = str(b?.email, 120);
   const purpose = b?.purpose === "reset" ? "reset" : "register";
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err(c, 400, "valid email required");
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = randDigits(6);
   const hash = await hashPassword(code, "otp-static-salt");
   await c.env.DB.prepare(`UPDATE otp_codes SET used = 1 WHERE email = ? AND purpose = ?`).bind(email, purpose).run();
   await c.env.DB.prepare(`INSERT INTO otp_codes (email, purpose, code_hash, expires_at) VALUES (?,?,?, datetime('now', '+10 minutes'))`).bind(email, purpose, hash).run();
@@ -1043,7 +1053,7 @@ app.post("/api/auth/recover-email", async (c) => {
 });
 
 const slugify = (name: string) =>
-  (name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, "-").replace(/^-+|-+$/g, "") || "project") + "-" + Math.random().toString(36).slice(2, 8);
+  (name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, "-").replace(/^-+|-+$/g, "") || "project") + "-" + randSuffix(6);
 
 app.post("/api/my/projects", async (c) => {
   const m = await currentUser(c);
@@ -1420,7 +1430,7 @@ app.post("/api/admin/columns", async (c) => {
   const title = str(b?.title, 200);
   const text = str(b?.text, 20000);
   if (!title || !text) return err(c, 400, "title and text required");
-  const slug = "col-" + Math.random().toString(36).slice(2, 8);
+  const slug = "col-" + randSuffix(6);
   const topics = (String(b?.text ?? "").match(/#([\w\u4e00-\u9fff-]{2,30})/g) ?? []).join(" ");
   await c.env.DB.prepare(
     `INSERT INTO columns (slug, column_label, title, subtitle, author, author_title, text, kind, topics) VALUES (?,?,?,?,?,?,?,?,?)`)

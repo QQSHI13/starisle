@@ -1,6 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 
+// Markdown is rendered for member-submitted content (project bodies, columns,
+// comments-in-waiting), so raw HTML is escaped and only safe URL schemes kept.
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+const SAFE_URL = /^(https?:|mailto:|\/|#)/i;
+marked.use({
+  renderer: {
+    html({ raw, text }: any) {
+      return escapeHtml(String(raw ?? text ?? ""));
+    },
+    link({ href, title, tokens }: any) {
+      const inner = (this as any).parser.parseInline(tokens);
+      const h = String(href ?? "");
+      if (!SAFE_URL.test(h)) return inner;
+      const t = title ? ` title="${escapeHtml(String(title))}"` : "";
+      return `<a href="${escapeHtml(h)}"${t} target="_blank" rel="noreferrer noopener">${inner}</a>`;
+    },
+    image({ href, title, text }: any) {
+      const h = String(href ?? "");
+      if (!SAFE_URL.test(h)) return escapeHtml(String(text ?? ""));
+      const t = title ? ` title="${escapeHtml(String(title))}"` : "";
+      return `<img src="${escapeHtml(h)}" alt="${escapeHtml(String(text ?? ""))}"${t} loading="lazy" />`;
+    },
+  },
+} as any);
+
 // Lazy loaders — heavy libraries load from CDN only when content needs them.
 const CDN = ["https://cdn.jsdelivr.net/npm", "https://unpkg.com", "https://cdnjs.cloudflare.com/ajax"];
 const tryImport = async (paths: string[]) => {
@@ -46,7 +73,7 @@ const loadMermaid = () => {
     mermaidLoading = tryImport(["/vendor/mermaid/mermaid.esm.min.mjs", "mermaid@11/dist/mermaid.esm.min.mjs"])
       .then((m) => {
         const lib = m.default ?? m;
-        lib.initialize({ startOnLoad: false, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral" });
+        lib.initialize({ startOnLoad: false, securityLevel: "strict", theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral" });
         return lib;
       }).catch(() => null);
   }
@@ -103,7 +130,7 @@ export function Md({ text }: { text: string }) {
   }, [ready, text]);
 
   const html = (() => {
-    let t = text;
+    let t = escapeHtml(text);
     if (hasMath) {
       t = t.replace(/\$\$([^$]+)\$\$/g, (_, m) => `<div class="math-block">${m}</div>`);
       t = t.replace(/\$([^$\n]+)\$/g, (_, m) => `<span class="math-inline">${m}</span>`);

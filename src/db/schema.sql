@@ -123,7 +123,9 @@ CREATE TABLE IF NOT EXISTS columns (
   author TEXT NOT NULL DEFAULT '',
   author_title TEXT NOT NULL DEFAULT '',
   text TEXT NOT NULL,
-  published_at TEXT NOT NULL DEFAULT (date('now'))
+  published_at TEXT NOT NULL DEFAULT (date('now')),
+  kind TEXT NOT NULL DEFAULT 'article',
+  topics TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS mentors (

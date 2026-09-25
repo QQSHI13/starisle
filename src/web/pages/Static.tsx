@@ -87,7 +87,7 @@ export function Privacy() {
       <div className="wrap"><article className="prose">
         {zh ? (<>
           <h2>申请前请先了解</h2>
-          <p>注册会收集用户名、显示名、邮箱、密码和申请说明；开源链接为选填。这些信息用于审核申请、登录和提供社区功能。密码以加盐哈希保存，任何人不能查看原密码。本站目前没有邮箱验证或邮件找回密码功能。</p>
+          <p>注册会收集用户名、显示名、邮箱、密码和申请说明；开源链接为选填。这些信息用于审核申请、登录和提供社区功能。密码以加盐哈希保存，任何人不能查看原密码。注册需通过注册邮箱接收 6 位验证码完成核验；忘记密码可通过邮箱验证码或一次性恢复码重置。</p>
           <p><strong>用户名会出现在公开成员资料和主页地址中。</strong>当前注册要求填写真实姓名，因此不要把用户名误认为仅管理员可见。显示名、头像、个人简介、开源链接及已上线的项目和成员关系也会公开。邮箱和申请说明不在公开成员目录中展示，管理员可为审核和账号管理查看必要资料。</p>
           <p>注册时分别确认阅读说明和公开资料范围。暂不愿公开上述资料，请先不要提交申请；仍可浏览公开内容。</p>
           <h2>未成年人及监护人</h2>
@@ -97,12 +97,12 @@ export function Privacy() {
           <p>登录使用浏览器 Cookie；会话记录包含到期时间、IP 和浏览器信息。申请回执保存在提交申请的设备上，用于查询审核结果。清除浏览器数据可能使回执丢失，但仍可凭用户名和密码查询申请。</p>
           <h2>修改、注销与账号恢复</h2>
           <p>登录后可在个人信息设置中修改资料和密码。用户名变更需要验证当前密码；注销前需先撤回自己发起的项目。注销功能会停用账号并清除部分个人资料，用户名、关联记录和备份可能保留，不等同于立即彻底删除所有历史数据。</p>
-          <p>可在账号恢复页面验证当前密码后生成一次性恢复码。恢复码仅显示一次，请自行妥善保存；不要发给其他人。没有预先保存的有效恢复码时，本站不能自动找回密码。</p>
+          <p>可在账号恢复页面验证当前密码后生成一次性恢复码。恢复码仅显示一次，请自行妥善保存；不要发给其他人。未保存恢复码时，仍可通过注册邮箱接收验证码重置密码。</p>
           <h2>隐私咨询与举报</h2>
           <p>已有入会联系渠道的用户，可通过该渠道向管理员反馈，并仅提供定位问题所需的页面链接和说明。不要发送密码、恢复码或无关个人信息。申请和项目由人工审核，目前没有承诺固定处理时限。申请可在“申请查询”查看；项目审核结果及补充要求会发送到站内消息。</p>
         </>) : (<>
           <h2>Before you apply</h2>
-          <p>Registration collects username, display name, email, password and an application statement; a repository link is optional. This information is used to review applications, sign you in and provide community features. Passwords are stored as salted hashes and cannot be read back by anyone. There is no email verification or email password reset.</p>
+          <p>Registration collects username, display name, email, password and an application statement; a repository link is optional. This information is used to review applications, sign you in and provide community features. Passwords are stored as salted hashes and cannot be read back by anyone. Registration is confirmed with a 6-digit code sent to your email; a forgotten password can be reset via an email code or a one-time recovery code.</p>
           <p><strong>Your username appears in the public member directory and your profile URL.</strong> Real names are currently required at registration. Display name, avatar, bio, repository links, published projects and project memberships are also public. Email and application statements are not shown in the public directory; admins may view what is necessary for review and account management.</p>
           <p>If you do not want this information public, do not submit an application yet. Public content remains browsable.</p>
           <h2>Minors and guardians</h2>
@@ -112,7 +112,7 @@ export function Privacy() {
           <p>Sign-in uses browser cookies; session records include expiry, IP and browser information. The application receipt is stored on the device used to apply. Clearing browser data may lose the receipt, but you can still query by username and password.</p>
           <h2>Changes, deactivation and recovery</h2>
           <p>You can edit your profile and password after signing in. Changing your username requires your current password. Deactivating removes part of your profile; usernames, relationship records and backups may be retained and deletion is not instant.</p>
-          <p>A one-time recovery code can be generated after password verification. It is shown exactly once — keep it safe, never share it. Without a saved valid code there is no automated way to reset a password.</p>
+          <p>A one-time recovery code can be generated after password verification. It is shown exactly once — keep it safe, never share it. Without a saved code, you can still reset your password with a code sent to your registered email.</p>
           <h2>Contact and reports</h2>
           <p>Users with an existing enrollment contact channel can report issues there, providing only the links and details needed. Never send passwords or recovery codes. Applications and projects are human-reviewed with no fixed processing time limit; application status is available on the status page, and project review results arrive as on-site messages.</p>
         </>)}

@@ -322,8 +322,6 @@ function CourseTools() {
   const [ltitle, setLtitle] = useState(""); const [lsummary, setLsummary] = useState(""); const [lcontent, setLcontent] = useState("");
   const [lessonId, setLessonId] = useState(""); const [htitle, setHtitle] = useState(""); const [hdue, setHdue] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  const lessons = useFetch<{ lessons: any[] }>(courseSlug ? null : null, []);
-  void lessons;
   return (
     <section style={{ padding: "0 0 28px" }}>
       <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="book" size={17} /> 课程与作业 · Courses & homework</h3>
@@ -358,9 +356,6 @@ function CourseTools() {
 }
 
 function LessonList({ slug }: { slug: string }) {
-  const [tick, setTick] = useState(0);
-  const { data } = useFetch<{ lessons: any[] }>(null, []);
-  void data; void tick; void setTick;
   const { data: cd } = useFetch<{ lessons: any[] }>(`/courses/${slug}`, [slug]);
   return (
     <div>
