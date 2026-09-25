@@ -2,6 +2,15 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useFetch } from "../hooks";
 import { Avatar } from "../Avatar";
 
+const Hi = ({ text, q }: { text?: string; q: string }) => {
+  if (!text) return null;
+  const terms = q.split(/\s+/).filter(Boolean);
+  const pattern = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  if (!pattern) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${pattern})`, "gi"));
+  return <>{parts.map((part, i) => terms.some((t) => part.toLowerCase() === t.toLowerCase()) ? <mark key={i} style={{ background: "var(--gold-soft)", color: "var(--gold)", borderRadius: 2, padding: "0 2px" }}>{part}</mark> : part)}</>;
+};
+
 export default function Search() {
   const [sp] = useSearchParams();
   const q = sp.get("q") ?? "";
@@ -11,13 +20,13 @@ export default function Search() {
     <div className="wrap" style={{ padding: "48px 24px" }}>
       <h1 className="serif" style={{ fontSize: 30 }}>搜索：{q}</h1>
       <h3>项目</h3>
-      {(data?.projects ?? []).map((p) => <div className="member-row" key={p.slug}><span className="dname" style={{ fontSize: 16 }}><Link to={`/projects/${p.slug}`}>{p.name}</Link></span><span className="bio">{p.tagline}</span></div>)}
+      {(data?.projects ?? []).map((p) => <div className="member-row" key={p.slug}><span className="dname" style={{ fontSize: 16 }}><Link to={`/projects/${p.slug}`}>{p.name}</Link></span><span className="bio"><Hi text={p.tagline} q={q} /></span></div>)}
       <h3 style={{ marginTop: 30 }}>专栏</h3>
-      {(data?.columns ?? []).map((c) => <div className="member-row" key={c.slug}><span className="dname" style={{ fontSize: 16 }}><Link to={`/columns/${c.slug}`}>{c.title}</Link></span><span className="bio">{c.subtitle} {c.topics}</span></div>)}
+      {(data?.columns ?? []).map((c) => <div className="member-row" key={c.slug}><span className="dname" style={{ fontSize: 16 }}><Link to={`/columns/${c.slug}`}>{c.title}</Link></span><span className="bio"><Hi text={`${c.subtitle ?? ""} ${c.topics ?? ""}`} q={q} /></span></div>)}
       <h3 style={{ marginTop: 30 }}>项目动态</h3>
-      {(data?.updates ?? []).map((u, i) => <div className="member-row" key={i}><span className="bio" style={{ flex: 1 }}><Link to={`/projects/${u.project_slug}`}>{u.project_name}</Link> — {u.text}</span><span className="bio">{u.created_at.slice(0,10)}</span></div>)}
+      {(data?.updates ?? []).map((u, i) => <div className="member-row" key={i}><span className="bio" style={{ flex: 1 }}><Link to={`/projects/${u.project_slug}`}>{u.project_name}</Link> — <Hi text={u.text} q={q} /></span><span className="bio">{u.created_at.slice(0,10)}</span></div>)}
       <h3 style={{ marginTop: 30 }}>成员</h3>
-      {(data?.members ?? []).map((m) => <div className="member-row" key={m.id}><Avatar name={m.display_name} size={26} /><span className="dname" style={{ fontSize: 16 }}>{m.display_name}</span><span className="bio">{m.bio}</span></div>)}
+      {(data?.members ?? []).map((m) => <div className="member-row" key={m.id}><Avatar name={m.display_name} size={26} /><span className="dname" style={{ fontSize: 16 }}>{m.display_name}</span><span className="bio"><Hi text={m.bio} q={q} /></span></div>)}
       {data && !(data.projects?.length || data.columns?.length || data.members?.length) && <p className="dim">没有匹配结果。</p>}
     </div>
   );

@@ -39,9 +39,17 @@ const Star = () => (
 function SearchBox() {
   const nav = useNavigate();
   const [q, setQ] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); inputRef.current?.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) nav(`/search?q=${encodeURIComponent(q.trim())}`); }} style={{ marginRight: 4 }}>
-      <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索…" aria-label="搜索" style={{ width: 110, padding: "5px 10px", fontSize: 13, borderRadius: 999 }} />
+      <input ref={inputRef} type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索… ⌘K" aria-label="搜索" style={{ width: 130, padding: "5px 12px", fontSize: 13, borderRadius: 999 }} />
     </form>
   );
 }
