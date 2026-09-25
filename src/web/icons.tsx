@@ -1,11 +1,11 @@
 import {
-  Star, Github, Users, Clock, GitFork, Check, Circle, ArrowRight,
+  Star, CodeXml, Users, Clock, GitFork, Check, Circle, ArrowRight,
   ExternalLink, Play, Link2, type LucideIcon,
 } from "lucide-react";
 
 const MAP: Record<string, LucideIcon> = {
   star: Star,
-  repo: Github,
+  repo: CodeXml,
   users: Users,
   clock: Clock,
   fork: GitFork,
