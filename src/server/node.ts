@@ -131,6 +131,7 @@ async function handle(request: Request): Promise<Response> {
     const type = MIME[extname(file)] ?? "application/octet-stream";
     const cacheHdr = extname(file) === ".html" ? "no-cache"
       : file.includes(`${DIST}/assets/`) || /\.(jpg|png|webp|woff2)$/.test(file) ? "public, max-age=31536000, immutable"
+      : file.includes(`${DIST}/vendor/`) ? "no-cache"
       : "public, max-age=86400";
     const gz = /text|javascript|css|json|svg/.test(type) && (request.headers.get("accept-encoding") ?? "").includes("gzip") && data.length > 1024;
     const headers: Record<string, string> = { "Content-Type": type, "Cache-Control": cacheHdr, Vary: "Accept-Encoding", ...SEC_HEADERS };

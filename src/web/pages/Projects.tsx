@@ -172,7 +172,7 @@ export function ProjectDetail() {
                 await api(`/projects/${slug}/updates`, { method: "POST", body: JSON.stringify({ text: msg }) });
                 setMsg(""); location.reload(); }}>
                 <label className="field"><span>{lang === "zh" ? "发布进展" : "Post an update"}</span>
-                  <Editor value={msg} onChange={setMsg} rows={2} preview={false} /></label>
+                  <Editor value={msg} onChange={setMsg} rows={2} /></label>
                 <button className="btn small primary">{lang === "zh" ? "发布" : "Post"}</button>
               </form>
             ) : (

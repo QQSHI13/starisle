@@ -38,7 +38,7 @@ function Comments({ targetId }: { targetId: number }) {
           catch (e2: any) { setNote(String(e2.message)); } }}>
           {note && <div className="notice" role="status">{note}</div>}
           <label className="field"><span>{lang === "zh" ? "写下你的想法（支持 Markdown、KaTeX 公式、Mermaid 图）" : "Your thoughts (Markdown, KaTeX, Mermaid supported)"}</span>
-            <Editor value={text} onChange={setText} rows={3} preview={false} /></label>
+            <Editor value={text} onChange={setText} rows={3} /></label>
           <button className="btn primary small">{lang === "zh" ? "发表评论" : "Comment"}</button>
           <button className="btn small" type="button" style={{ marginLeft: 8 }} onClick={() => { setText(""); setNote(null); }}>{lang === "zh" ? "取消" : "Cancel"}</button>
         </form>

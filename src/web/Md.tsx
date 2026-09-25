@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { marked } from "marked";
 
 // Markdown is rendered for member-submitted content (project bodies, columns,
@@ -50,10 +50,10 @@ let katexLoading: Promise<any> | null = null;
 const loadKatex = () => {
   if (!katexLoading) {
     katexLoading = Promise.all([
-      tryImport(["/vendor/katex/katex.min.mjs", "katex@0.16.11/dist/katex.min.mjs"]).then((m) => m.default ?? m),
+      tryImport(["/vendor/katex/katex.min.mjs?v=2", "katex@0.16.11/dist/katex.min.mjs"]).then((m) => m.default ?? m),
       new Promise<void>((res) => {
         let i = 0;
-        const HREFS = ["/vendor/katex/katex.min.css", ...CDN.map((b) => `${b}/katex@0.16.11/dist/katex.min.css`)];
+        const HREFS = ["/vendor/katex/katex.min.css?v=2", ...CDN.map((b) => `${b}/katex@0.16.11/dist/katex.min.css`)];
         const attempt = () => {
           if (i >= HREFS.length) return res();
           const l = document.createElement("link");
@@ -73,7 +73,7 @@ const loadKatex = () => {
 let mermaidLoading: Promise<any> | null = null;
 const loadMermaid = () => {
   if (!mermaidLoading) {
-    mermaidLoading = tryImport(["/vendor/mermaid/mermaid.esm.min.mjs", "mermaid@11/dist/mermaid.esm.min.mjs"])
+    mermaidLoading = tryImport(["/vendor/mermaid/mermaid.esm.min.mjs?v=2", "mermaid@11/dist/mermaid.esm.min.mjs"])
       .then((m) => {
         const lib = m.default ?? m;
         lib.initialize({ startOnLoad: false, securityLevel: "strict", theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral" });
@@ -85,27 +85,17 @@ const loadMermaid = () => {
 
 export function Md({ text }: { text: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(0);
   const hasMath = /\$\$[^$]+\$\$|\$[^$\n]+\$/.test(text);
   const hasMermaid = /```mermaid/.test(text);
 
   useEffect(() => {
     let live = true;
     (async () => {
-      if (hasMath) await loadKatex();
-      if (hasMermaid) await loadMermaid();
-      if (live) setReady((x) => x + 1);
-    })();
-  }, [text, hasMath, hasMermaid]);
-
-  useEffect(() => {
-    if (!ref.current || ready === 0) return;
-    (async () => {
       if (hasMath) {
         const k = await loadKatex();
-        if (!k) return;
+        if (!live || !k || !ref.current) return;
         const katex = k[0];
-        ref.current!.querySelectorAll(".math-block, .math-inline").forEach((el) => {
+        ref.current.querySelectorAll(".math-block, .math-inline").forEach((el) => {
           if ((el as any).dataset.done) return;
           try {
             katex.render(el.textContent ?? "", el, { displayMode: el.classList.contains("math-block"), throwOnError: false });
@@ -115,8 +105,8 @@ export function Md({ text }: { text: string }) {
       }
       if (hasMermaid) {
         const mermaid = await loadMermaid();
-        if (!mermaid) return;
-        const nodes = [...ref.current!.querySelectorAll("pre code.language-mermaid")];
+        if (!live || !mermaid || !ref.current) return;
+        const nodes = [...ref.current.querySelectorAll("pre code.language-mermaid")];
         for (const [i, node] of nodes.entries()) {
           if ((node.parentElement as any)?.dataset.done) continue;
           const host = document.createElement("div");
@@ -124,13 +114,15 @@ export function Md({ text }: { text: string }) {
           try {
             const { svg } = await mermaid.render(`mmd-${Date.now()}-${i}`, node.textContent ?? "");
             host.innerHTML = svg;
+            if (!live) return;
             node.parentElement!.replaceWith(host);
             (host as any).dataset.done = "1";
           } catch { /* leave code */ }
         }
       }
     })();
-  }, [ready, text]);
+    return () => { live = false; };
+  }, [text, hasMath, hasMermaid]);
 
   const html = (() => {
     const stash: string[] = [];
