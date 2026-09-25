@@ -228,7 +228,7 @@ function CommentsQueue() {
       <h3 style={{display:"flex",alignItems:"center",gap:8}}><I name="message" size={17} /> 评论审核 · Comments ({items.length})</h3>
       {items.map((cm: any) => (
         <div className="member-row" key={cm.id}>
-          <span className="bio" style={{ flex: 1 }}><b>{cm.author}</b> 在《{cm.column_title}》:{cm.text}</span>
+          <span className="bio" style={{ flex: 1 }}><b>{cm.author}</b> 在《{cm.column_title ?? cm.project_title}》:{cm.text}</span>
           <button className="btn small primary" onClick={() => decide(cm.id, "approve")}><I name="check" size={13} /> 通过</button>{" "}
           <button className="btn small danger" onClick={() => decide(cm.id, "reject")}><I name="ban" size={13} /> 拒绝</button>
         </div>

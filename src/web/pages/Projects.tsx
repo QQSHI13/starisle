@@ -8,6 +8,8 @@ import { Avatar } from "../Avatar";
 import { api } from "../api";
 import { useMe } from "../App";
 import { useHighlight } from "../hl";
+import { Comments } from "../Comments";
+import { LikeBtn } from "../LikeBtn";
 import { ProjectForm } from "./ProjectForm";
 import { Md } from "../Md";
 import { useToast } from "../toast";
@@ -168,6 +170,7 @@ export function ProjectDetail() {
               toast(data.following ? "已取消关注" : "已关注"); setTimeout(() => location.reload(), 600);
             }}><I name="heart" size={13} />{data.following ? (lang === "zh" ? "已关注 ✓" : "Following ✓") : (lang === "zh" ? "关注这个项目" : "Follow")}</button>
             <span className="dim" style={{ marginLeft: 10, fontSize: 13 }}>{data.followers} {lang === "zh" ? "人关注" : "followers"}</span>
+            <span style={{ marginLeft: 14 }}><LikeBtn targetType="project" targetId={p.id} initial={{ count: (data as any).likes_count ?? 0, liked: !!(data as any).liked }} /></span>
           </p>
         )}
         {me && (
@@ -198,15 +201,17 @@ export function ProjectDetail() {
         {data.updates.length > 0 && (
           <>
             <h3>{lang === "zh" ? "项目动态" : "Updates"}</h3>
-            {data.updates.map((u, i) => (
+            {data.updates.map((u: any, i: number) => (
               <div key={i} className="mstone" style={{ borderBottom: "1px solid var(--line)" }}>
                 <span className="mtext" style={{ color: "var(--ink)" }}>{u.text}</span>
                 <span className="dim" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{u.author} · {u.created_at.slice(0, 16)}</span>
+                <LikeBtn targetType="update" targetId={u.id} initial={{ count: u.likes_count ?? 0, liked: !!u.liked }} />
               </div>
             ))}
           </>
         )}
         {p.body && <div className="prose" style={{ padding: "24px 0" }}><Md text={p.body.replace(/\\n/g, "\n")} /></div>}
+        <Comments targetId={p.id} targetType="project" />
       </div>
       <aside className="aside-card">
         <h4>项目概览</h4>

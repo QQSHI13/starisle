@@ -341,3 +341,13 @@ CREATE TABLE IF NOT EXISTS rsvps (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (activity_id, member_id)
 );
+
+CREATE TABLE IF NOT EXISTS likes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_type TEXT NOT NULL,
+  target_id INTEGER NOT NULL,
+  member_id INTEGER NOT NULL REFERENCES members(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (target_type, target_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_likes_target ON likes(target_type, target_id);

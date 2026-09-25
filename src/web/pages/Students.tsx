@@ -45,7 +45,7 @@ export function Profile() {
   const { me } = useMe();
   const [following, setFollowing] = useState(false);
   const { t } = useLang();
-  const { data, error } = useFetch<{ member: any; projects: any[] }>(`/members/${encodeURIComponent(username!)}`, [username]);
+  const { data, error } = useFetch<{ member: any; projects: any[]; followers?: any[]; following?: any[]; activity?: any[] }>(`/members/${encodeURIComponent(username!)}`, [username]);
   const [sp] = useSearchParams();
   const hlRef = useRef<HTMLDivElement>(null);
   useHighlight(hlRef, sp.get("hl") ?? "", [data]);
@@ -70,6 +70,8 @@ export function Profile() {
             </h1>
             <div className="profile-stats">
               <div><b>{data.projects.length}</b><span>参与项目</span></div>
+              <div><b>{data.followers?.length ?? 0}</b><span>关注者</span></div>
+              <div><b>{data.following?.length ?? 0}</b><span>正在关注</span></div>
               <div><b>{(m.created_at ?? "—").slice(0, 10)}</b><span>加入时间</span></div>
               <div><b>{m.verified ? "已认证" : "成员"}</b><span>状态</span></div>
             </div>
@@ -95,6 +97,41 @@ export function Profile() {
           </div>
         ))}
       </div></section>
+      {(data.activity?.length || data.followers?.length || data.following?.length) ? (
+        <section className="block"><div className="wrap">
+          {data.activity && data.activity.length > 0 && (<>
+            <h3><I name="trend" size={18} /> TA 的动态</h3>
+            {data.activity.map((a: any, i: number) => (
+              <div className="mstone" key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                <span className="mtext" style={{ color: "var(--ink)" }}>{a.text}</span>
+                <span className="dim" style={{ fontSize: 12, whiteSpace: "nowrap" }}><Link to={`/projects/${a.slug}`}>{a.name}</Link> · {a.created_at.slice(0, 16)}</span>
+              </div>
+            ))}
+          </>)}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 32, marginTop: 24 }}>
+            <div>
+              <h3 style={{ fontSize: 17 }}><I name="users" size={15} /> 关注者 · {data.followers?.length ?? 0}</h3>
+              {(data.followers ?? []).map((f: any) => (
+                <div className="member-row" key={f.id}>
+                  <Avatar name={f.display_name} src={f.avatar} size={26} />
+                  <span className="dname" style={{ fontSize: 15 }}><Link to={`/u/${f.id}`}>{f.display_name}</Link></span>
+                </div>
+              ))}
+              {(data.followers ?? []).length === 0 && <p className="dim">—</p>}
+            </div>
+            <div>
+              <h3 style={{ fontSize: 17 }}><I name="user" size={15} /> 正在关注 · {data.following?.length ?? 0}</h3>
+              {(data.following ?? []).map((f: any) => (
+                <div className="member-row" key={f.id}>
+                  <Avatar name={f.display_name} src={f.avatar} size={26} />
+                  <span className="dname" style={{ fontSize: 15 }}><Link to={`/u/${f.id}`}>{f.display_name}</Link></span>
+                </div>
+              ))}
+              {(data.following ?? []).length === 0 && <p className="dim">—</p>}
+            </div>
+          </div>
+        </div></section>
+      ) : null}
     </>
   );
 }

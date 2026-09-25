@@ -53,7 +53,7 @@ const randSuffix = (n: number) => {
   return [...bytes].map((b) => (b % 36).toString(36)).join("");
 };
 
-// naive dev rate limiter
+// naive dev rate limiter — keyed on the best available client IP
 const hits = new Map<string, { n: number; t: number }>();
 function rateLimited(ip: string, max = 10): boolean {
   const now = Date.now();
@@ -61,6 +61,11 @@ function rateLimited(ip: string, max = 10): boolean {
   if (!e || now - e.t > 60_000) { hits.set(ip, { n: 1, t: now }); return false; }
   e.n++;
   return e.n > max;
+}
+function clientIp(c: { req: any }): string {
+  const fwd = c.req.header("X-Forwarded-For");
+  if (fwd) return fwd.split(",")[0].trim();
+  return c.req.header("CF-Connecting-IP") ?? "local";
 }
 
 async function currentUser(c: { req: any; env: Bindings }): Promise<Member | null> {
@@ -80,6 +85,8 @@ const str = (v: unknown, max = 2000): string | null =>
   typeof v === "string" && v.trim().length > 0 ? v.trim().slice(0, max) : null;
 
 // ---------- public reads ----------
+app.get("/api/health", (c) => c.json({ ok: true, service: "starisle", time: new Date().toISOString() }));
+
 app.get("/api/stats", async (c) => {
   const members = await c.env.DB.prepare(
     `SELECT COUNT(*) n FROM members WHERE status='active'`).first<any>();
@@ -144,18 +151,29 @@ app.get("/api/projects/:slug", async (c) => {
   const isMember = viewer && await c.env.DB.prepare(`SELECT 1 x FROM project_members WHERE project_id = ? AND member_id = ?`).bind(p.id, viewer.id).first();
   const isAdmin2 = viewer && viewer.role === "admin";
   const updates = await c.env.DB.prepare(
-    `SELECT u.id, u.text, u.status, u.created_at, m.display_name AS author, m.id AS author_id FROM project_updates u
+    `SELECT u.id, u.text, u.status, u.created_at, m.display_name AS author, m.id AS author_id,
+       (SELECT COUNT(*) FROM likes l WHERE l.target_type = 'update' AND l.target_id = u.id) AS likes_count
+     FROM project_updates u
      JOIN members m ON m.id = u.author_id WHERE u.project_id = ? ${isMember || isAdmin2 ? "" : "AND u.status = 'approved' "}
      ORDER BY u.created_at DESC LIMIT 20`).bind(p.id).all();
+  const likedRows = viewer
+    ? (await c.env.DB.prepare(
+        `SELECT target_type, target_id FROM likes WHERE member_id = ? AND target_type IN ('project','update') AND target_id IN (SELECT id FROM project_updates WHERE project_id = ?)`).bind(viewer.id, p.id).all()).results as any[]
+    : [];
+  const likedSet = new Set(likedRows.map((r) => `${r.target_type}:${r.target_id}`));
+  const projectLikes = await c.env.DB.prepare(
+    `SELECT COUNT(*) n FROM likes WHERE target_type = 'project' AND target_id = ?`).bind(p.id).first<any>();
   const repo_stats = await repoStatsFor(c as any, p);
   return c.json({
     project: p, members: members.results,
     gaps: gaps.results.map((g: any) => g.label),
     stack: stacks.results.map((s: any) => s.tag),
     milestones: milestones.results,
-    updates: updates.results,
+    updates: updates.results.map((u: any) => ({ ...u, liked: likedSet.has(`update:${u.id}`) })),
     followers: followerCount?.n ?? 0,
     following: !!following,
+    likes_count: projectLikes?.n ?? 0,
+    liked: viewer ? likedSet.has(`project:${p.id}`) : false,
     repo_stats,
   });
 });
@@ -444,9 +462,14 @@ app.get("/api/columns", async (c) => {
 });
 
 app.get("/api/columns/:slug", async (c) => {
-  const column = await c.env.DB.prepare(`SELECT * FROM columns WHERE slug = ?`).bind(c.req.param("slug")).first();
+  const column = await c.env.DB.prepare(`SELECT * FROM columns WHERE slug = ?`).bind(c.req.param("slug")).first<any>();
   if (!column) return err(c, 404, "column not found");
-  return c.json({ column });
+  const viewer = await currentUser(c);
+  const likesCount = await c.env.DB.prepare(
+    `SELECT COUNT(*) n FROM likes WHERE target_type = 'column' AND target_id = ?`).bind(column.id).first<any>();
+  const liked = viewer ? await c.env.DB.prepare(
+    `SELECT 1 x FROM likes WHERE target_type = 'column' AND target_id = ? AND member_id = ?`).bind(column.id, viewer.id).first() : null;
+  return c.json({ column, likes_count: likesCount?.n ?? 0, liked: !!liked });
 });
 
 app.get("/api/members", async (c) => {
@@ -456,7 +479,7 @@ app.get("/api/members", async (c) => {
     `SELECT m.id, m.username, m.display_name, m.bio, m.website_url, m.avatar, m.verified, m.real_name_public, m.created_at,
        (SELECT COUNT(*) FROM project_members pm JOIN projects p ON p.id = pm.project_id
          WHERE pm.member_id = m.id AND p.status='approved') AS project_count
-     FROM members m WHERE m.status = 'active' ORDER BY m.created_at DESC`).all();
+     FROM members m WHERE m.status = 'active' ORDER BY m.created_at DESC LIMIT 500`).all();
   return c.json({ members: (results as any[]).map((m) => ({ ...m, username: m.real_name_public || showName ? m.username : null })) });
 });
 
@@ -474,7 +497,18 @@ app.get("/api/members/:username", async (c) => {
      JOIN projects p ON p.id = pm.project_id
      WHERE pm.member_id = (SELECT id FROM members WHERE username = ?) AND p.status='approved'`)
     .bind(c.req.param("username")).all();
-  return c.json({ member: m, projects: projects.results });
+  const mid = m.id;
+  const followers = await c.env.DB.prepare(
+    `SELECT m.id, m.display_name, m.avatar FROM member_follows f JOIN members m ON m.id = f.follower_id
+     WHERE f.followee_id = ? AND m.status = 'active' ORDER BY f.id DESC LIMIT 50`).bind(mid).all();
+  const following = await c.env.DB.prepare(
+    `SELECT m.id, m.display_name, m.avatar FROM member_follows f JOIN members m ON m.id = f.followee_id
+     WHERE f.follower_id = ? AND m.status = 'active' ORDER BY f.id DESC LIMIT 50`).bind(mid).all();
+  const activity = await c.env.DB.prepare(
+    `SELECT u.text, u.created_at, p.name, p.slug FROM project_updates u
+     JOIN projects p ON p.id = u.project_id WHERE u.author_id = ? AND u.status = 'approved'
+     ORDER BY u.created_at DESC LIMIT 10`).bind(mid).all();
+  return c.json({ member: m, projects: projects.results, followers: followers.results, following: following.results, activity: activity.results });
 });
 
 app.get("/api/mentors", async (c) => {
@@ -499,7 +533,7 @@ app.get("/api/partners", async (c) =>
 
 // ---------- auth ----------
 app.post("/api/auth/register", async (c) => {
-  if (rateLimited(c.req.header("CF-Connecting-IP") ?? "local")) return err(c, 429, "too many attempts, wait a minute");
+  if (rateLimited(clientIp(c))) return err(c, 429, "too many attempts, wait a minute");
   const b = await c.req.json().catch(() => null);
   if (!b) return err(c, 400, "invalid json");
   const username = str(b.username, 40);
@@ -561,7 +595,7 @@ async function createSession(c: any, memberId: number) {
 }
 
 app.post("/api/auth/login", async (c) => {
-  if (rateLimited(c.req.header("CF-Connecting-IP") ?? "local")) return err(c, 429, "too many attempts, wait a minute");
+  if (rateLimited(clientIp(c))) return err(c, 429, "too many attempts, wait a minute");
   const b = await c.req.json().catch(() => null);
   const username = str(b?.username, 40);
   const password = typeof b?.password === "string" ? b.password : "";
@@ -652,15 +686,41 @@ app.post("/api/auth/recover", async (c) => {
 
 app.get("/api/comments/list", async (c) => {
   const target = Number(c.req.query("target"));
+  const targetType = c.req.query("type") === "project" ? "project" : "column";
   if (!target) return err(c, 400, "target required");
   const me = await currentUser(c);
+  const likes = (t: string) =>
+    `(SELECT COUNT(*) FROM likes l WHERE l.target_type = '${t}' AND l.target_id = cm.id)`;
+  const liked = (t: string) =>
+    me ? `EXISTS(SELECT 1 FROM likes l WHERE l.target_type = '${t}' AND l.target_id = cm.id AND l.member_id = ${Number(me.id)})` : "0";
   const sql = me
-    ? `SELECT cm.*, m.display_name, m.avatar FROM comments cm JOIN members m ON m.id = cm.author_id
-       WHERE cm.target_type = 'column' AND cm.target_id = ? AND (cm.status = 'approved' OR cm.author_id = ?) ORDER BY cm.created_at`
-    : `SELECT cm.*, m.display_name, m.avatar FROM comments cm JOIN members m ON m.id = cm.author_id
-       WHERE cm.target_type = 'column' AND cm.target_id = ? AND cm.status = 'approved' ORDER BY cm.created_at`;
-  const { results } = await c.env.DB.prepare(sql).bind(...(me ? [target, me.id] : [target])).all();
+    ? `SELECT cm.*, m.display_name, m.avatar, ${likes("comment")} AS likes_count, ${liked("comment")} AS liked FROM comments cm JOIN members m ON m.id = cm.author_id
+       WHERE cm.target_type = ? AND cm.target_id = ? AND (cm.status = 'approved' OR cm.author_id = ?) ORDER BY cm.created_at LIMIT 100`
+    : `SELECT cm.*, m.display_name, m.avatar, ${likes("comment")} AS likes_count, 0 AS liked FROM comments cm JOIN members m ON m.id = cm.author_id
+       WHERE cm.target_type = ? AND cm.target_id = ? AND cm.status = 'approved' ORDER BY cm.created_at LIMIT 100`;
+  const { results } = await c.env.DB.prepare(sql).bind(...(me ? [targetType, target, me.id] : [targetType, target])).all();
   return c.json({ comments: results });
+});
+
+app.post("/api/likes/toggle", async (c) => {
+  const m = await currentUser(c);
+  if (!m) return err(c, 401, "not logged in");
+  const b = await c.req.json().catch(() => null);
+  const targetType = String(b?.target_type ?? "");
+  const targetId = Number(b?.target_id);
+  if (!["project", "column", "update", "comment"].includes(targetType) || !targetId)
+    return err(c, 400, "invalid target");
+  const existing = await c.env.DB.prepare(
+    `SELECT id FROM likes WHERE target_type = ? AND target_id = ? AND member_id = ?`).bind(targetType, targetId, m.id).first<any>();
+  if (existing) {
+    await c.env.DB.prepare(`DELETE FROM likes WHERE id = ?`).bind(existing.id).run();
+  } else {
+    await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO likes (target_type, target_id, member_id) VALUES (?,?,?)`).bind(targetType, targetId, m.id).run();
+  }
+  const { n } = await c.env.DB.prepare(
+    `SELECT COUNT(*) n FROM likes WHERE target_type = ? AND target_id = ?`).bind(targetType, targetId).first<any>() as any;
+  return c.json({ liked: !existing, count: n });
 });
 
 app.post("/api/comments", async (c) => {
@@ -669,9 +729,14 @@ app.post("/api/comments", async (c) => {
   const b = await c.req.json().catch(() => null);
   const text = str(b?.text, 2000);
   const targetId = Number(b?.target_id);
+  const targetType = b?.target_type === "project" ? "project" : "column";
   if (!text || !targetId) return err(c, 400, "text and target required");
-  await c.env.DB.prepare(`INSERT INTO comments (target_type, target_id, author_id, text) VALUES ('column',?,?,?)`)
-    .bind(targetId, m.id, text).run();
+  const exists = targetType === "project"
+    ? await c.env.DB.prepare(`SELECT 1 x FROM projects WHERE id = ? AND status = 'approved'`).bind(targetId).first()
+    : await c.env.DB.prepare(`SELECT 1 x FROM columns WHERE id = ?`).bind(targetId).first();
+  if (!exists) return err(c, 404, "target not found");
+  await c.env.DB.prepare(`INSERT INTO comments (target_type, target_id, author_id, text) VALUES (?,?,?,?)`)
+    .bind(targetType, targetId, m.id, text).run();
   await notifyMentions(c.env.DB, text, "一条评论", m.display_name);
   return c.json({ ok: true, status: "pending" }, 201);
 });
@@ -680,8 +745,10 @@ app.get("/api/admin/comments", async (c) => {
   const m = await currentUser(c);
   if (!m || m.role !== "admin") return err(c, 403, "admin only");
   const { results } = await c.env.DB.prepare(
-    `SELECT cm.*, mem.display_name AS author, col.title AS column_title FROM comments cm
-     JOIN members mem ON mem.id = cm.author_id LEFT JOIN columns col ON col.id = cm.target_id
+    `SELECT cm.*, mem.display_name AS author, col.title AS column_title, p.name AS project_title FROM comments cm
+     JOIN members mem ON mem.id = cm.author_id
+     LEFT JOIN columns col ON col.id = cm.target_id AND cm.target_type = 'column'
+     LEFT JOIN projects p ON p.id = cm.target_id AND cm.target_type = 'project'
      WHERE cm.status = 'pending' ORDER BY cm.created_at`).all();
   return c.json({ comments: results });
 });
@@ -1063,8 +1130,12 @@ async function repoStatsFor(c: { env: Bindings; executionCtx?: ExecutionContext 
         .bind(project.id, JSON.stringify(stats)).run();
     }
   })();
-  if (cached) c.executionCtx?.waitUntil(refresh);
-  else await refresh;
+  if (cached) {
+    // Workers: keep the refresh alive past the response. Node/bun server has no
+    // execution context — await inline instead of backgrounding.
+    if (typeof c.executionCtx?.waitUntil === "function") c.executionCtx.waitUntil(refresh);
+    else await refresh;
+  } else await refresh;
   const after = await c.env.DB.prepare(`SELECT data FROM repo_cache WHERE project_id = ?`).bind(project.id).first<any>();
   return after ? JSON.parse(after.data) : null;
 }
@@ -1083,7 +1154,7 @@ async function sendEmail(to: string, subject: string, text: string): Promise<{ d
 const process_env: any = (globalThis as any).process?.env ?? {};
 
 app.post("/api/auth/email-otp", async (c) => {
-  if (rateLimited(c.req.header("CF-Connecting-IP") ?? "local")) return err(c, 429, "too many attempts, wait a minute");
+  if (rateLimited(clientIp(c))) return err(c, 429, "too many attempts, wait a minute");
   const b = await c.req.json().catch(() => null);
   const email = str(b?.email, 120);
   const purpose = b?.purpose === "reset" ? "reset" : "register";

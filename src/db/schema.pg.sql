@@ -338,3 +338,13 @@ CREATE INDEX IF NOT EXISTS idx_mfollows_follower ON member_follows(follower_id);
 CREATE INDEX IF NOT EXISTS idx_comments_target ON comments(target_type, target_id, status);
 CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_codes(email, purpose, used);
 CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_id, to_id, created_at);
+
+CREATE TABLE IF NOT EXISTS likes (
+  id BIGSERIAL PRIMARY KEY,
+  target_type TEXT NOT NULL,
+  target_id BIGINT NOT NULL,
+  member_id BIGINT NOT NULL REFERENCES members(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (target_type, target_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_likes_target ON likes(target_type, target_id);

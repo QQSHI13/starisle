@@ -452,3 +452,14 @@ header.site { box-shadow: 0 1px 0 var(--line); }
 .switch button { display: inline-flex; align-items: center; gap: 6px; }
 .switch a { display: inline-flex; align-items: center; gap: 6px; }
 a.card .meta svg.lucide { color: var(--gold); }
+
+/* ---------- likes ---------- */
+.like-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: 0; cursor: pointer; padding: 2px 4px;
+  color: var(--ink-3); font-size: 12.5px; font-family: var(--sans); border-radius: 4px;
+  transition: color .15s ease, transform .1s ease;
+}
+.like-btn:hover { color: #c0392b; }
+.like-btn:active { transform: scale(.9); }
+.like-btn.liked { color: #c0392b; }

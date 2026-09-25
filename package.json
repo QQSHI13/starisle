@@ -11,7 +11,8 @@
     "demo": "rm -rf data dist && bun run seed && bun run build && (bun src/server/node.ts & sleep 4 && bun scripts/seed-demo.mjs && wait)",
     "seed": "bun scripts/fetch-seed.mjs && bun scripts/hash-passwords.mjs",
     "deploy": "bunx wrangler deploy",
-    "seed:demo": "bun scripts/seed-demo.mjs"
+    "seed:demo": "bun scripts/seed-demo.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "hono": "^4.13.9",
